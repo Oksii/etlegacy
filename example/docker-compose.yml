@@ -1,0 +1,28 @@
+services:
+  etl-stable:
+    container_name: etl-stable
+    image: oksii/etlegacy:stable
+    env_file: .env
+    environment:
+      - 'HOSTNAME=ETLDocker Stable' 
+    volumes:
+      - ./maps:/maps
+    ports:
+      - '27960:27960/udp'
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  etl-latest:
+    container_name: etl-latest
+    image: oksii/etlegacy:latest
+    env_file: .env
+    environment:
+      - 'HOSTNAME=ETLDocker Latest'
+    volumes:
+      - ./maps:/maps
+    ports:
+      - '27960:27960/udp'
+    stdin_open: true
+    tty: true
+    restart: unless-stopped

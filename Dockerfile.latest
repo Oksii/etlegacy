@@ -1,0 +1,55 @@
+FROM debian:stable-slim AS builder
+ENV DEBIAN_FRONTEND noninteractive
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y \
+        curl \
+        git \
+        unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Define build arguments
+ARG STATIC_URL_LATEST
+ARG STATIC_URL_BASEGAME
+
+# Fetch and unpack the appropriate etlegacy version
+RUN mkdir -p /legacy/server/etmain/mapscripts && \
+    curl -SL "$STATIC_URL_LATEST" | tar xz -C /legacy/server --strip-components=1 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Rename etlded binary and associated script
+RUN mv /legacy/server/etlded.$(arch) /legacy/server/etlded && \
+    mv /legacy/server/etlded_bot.$(arch).sh /legacy/server/etlded_bot.sh
+
+# Fetch and unpack etmain files
+RUN curl -SL "$STATIC_URL_BASEGAME" -o /tmp/etmain.zip && \
+    unzip -d /legacy/server/etmain /tmp/etmain.zip && \
+    rm -f /tmp/etmain.zip
+
+# Clone legacy-config repository
+RUN git clone --depth 1 "https://github.com/Oksii/legacy-configs.git" /legacy/server/settings && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set up entrypoint script
+COPY --chown=legacy:legacy entrypoint.sh /legacy/server/start
+RUN chmod +x /legacy/server/start
+RUN mkdir /legacy/homepath
+
+# Final stage
+FROM debian:stable-slim
+RUN apt-get update && apt-get install -y wget git
+RUN useradd -Ms /bin/bash legacy
+COPY --from=builder --chown=legacy:legacy /legacy /legacy/
+WORKDIR /legacy/server
+
+# Set up volumes
+VOLUME /legacy/homepath
+VOLUME /legacy/server/etmain
+
+# Expose port
+EXPOSE 27960/UDP
+
+# Switch to non-root user and set entrypoint
+USER legacy
+ENTRYPOINT ["./start"]74ae89653a2
