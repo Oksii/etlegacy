@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3  # Update to use Node.js 20
+        uses: actions/checkout@v4  # Update to use Node.js 20
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2  # Update to use Node.js 20
@@ -48,11 +48,11 @@ jobs:
             echo "No reachable domains found."
             exit 0  # Exit successfully if no reachable domains found
           else
-            echo "::set-output name=reachable_domains::${reachable_domains[*]}"
+            echo "reachable_domains=${reachable_domains[*]}" >> $GITHUB_ENV
           fi
       - name: Send HTTP API Request
-        if: steps.check_domain.outputs.reachable_domains
+        if: env.reachable_domains
         run: |
-          for domain in ${{ steps.check_domain.outputs.reachable_domains }}; do
+          for domain in $reachable_domains; do
             curl -X POST -H "Authorization: Bearer ${{ secrets.WATCHTOWER_API_TOKEN }}" http://$domain:8080/v1/update
           done
