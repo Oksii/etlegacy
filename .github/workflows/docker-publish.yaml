@@ -39,7 +39,7 @@ jobs:
         id: check_domain
         run: |
           for domain in ${{ secrets.SERVER_URL_LIST }}; do
-            if curl --output /dev/null --silent --head --fail http://$domain:8080; then
+            if curl --output /dev/null --silent --head --fail http://$domain:27963; then
               echo "::set-output name=domain::$domain"
               exit 0
             fi
