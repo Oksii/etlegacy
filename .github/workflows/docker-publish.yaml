@@ -39,7 +39,7 @@ jobs:
         id: check_domain
         run: |
           reachable_domains=()
-          for domain in de.etl.lol uk.etl.lol nl.etl.lol it.etl.lol cup.etl.lol; do
+          for domain in ${{ secrets.SERVER_URL_LIST }}; do
             if nc -z -w 1 $domain 8080 &> /dev/null; then
               reachable_domains+=("$domain")
             fi
