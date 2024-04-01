@@ -39,7 +39,7 @@ jobs:
         id: check_domain
         run: |
           for domain in ${{ secrets.SERVER_URL_LIST }}; do
-            if curl --output /dev/null --silent --head --fail http://$domain:27963; then
+            if curl --output /dev/null --silent --head --fail http://$domain:8080; then
               echo "::set-output name=domain::$domain"
               exit 0
             fi
@@ -48,4 +48,4 @@ jobs:
       - name: Send HTTP API Request
         if: steps.check_domain.outputs.domain
         run: |
-          curl -X POST -H "Authorization: Bearer ${{ secrets.WATCHTOWER_API_TOKEN }}" http://${{ steps.check_domain.outputs.domain }}:27963/v1/update
+          curl -X POST -H "Authorization: Bearer ${{ secrets.WATCHTOWER_API_TOKEN }}" http://${{ steps.check_domain.outputs.domain }}:8080/v1/update
