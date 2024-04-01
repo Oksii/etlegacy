@@ -38,14 +38,20 @@ jobs:
       - name: Check Domain Availability
         id: check_domain
         run: |
+          reachable_domains=()
           for domain in de.etl.lol uk.etl.lol nl.etl.lol it.etl.lol cup.etl.lol; do
-            if curl --output /dev/null --silent --head --fail http://$domain:8080; then
-              echo "::set-output name=domain::$domain"
-              exit 0
+            if nc -z -w 1 $domain 8080 &> /dev/null; then
+              reachable_domains+=("$domain")
             fi
           done
-          exit 1
+          if [ ${#reachable_domains[@]} -eq 0 ]; then
+            echo "No reachable domains found."
+            exit 1
+          fi
+          echo "::set-output name=reachable_domains::${reachable_domains[*]}"
       - name: Send HTTP API Request
-        if: steps.check_domain.outputs.domain
+        if: steps.check_domain.outputs.reachable_domains
         run: |
-          curl -X POST -H "Authorization: Bearer ${{ secrets.WATCHTOWER_API_TOKEN }}" http://${{ steps.check_domain.outputs.domain }}:8080/v1/update
+          for domain in ${{ steps.check_domain.outputs.reachable_domains }}; do
+            curl -X POST -H "Authorization: Bearer ${{ secrets.WATCHTOWER_API_TOKEN }}" http://$domain:8080/v1/update
+          done
