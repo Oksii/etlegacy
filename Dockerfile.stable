@@ -32,13 +32,17 @@ RUN git clone --depth 1 "https://github.com/Oksii/legacy-configs.git" /legacy/se
     rm -rf /var/lib/apt/lists/*
 
 # Set up entrypoint script
-COPY entrypoint.sh /legacy/server/start
+COPY --chown=legacy:legacy entrypoint.sh /legacy/server/start
 RUN chmod +x /legacy/server/start
 RUN mkdir /legacy/homepath
 
+# script to check playercounts for automated restarts
+COPY --chown=legacy:legacy playercount.sh /legacy/server/playercount
+RUN chmod +x /legacy/server/playercount
+
 # Final stage
 FROM debian:stable-slim
-RUN apt-get update && apt-get install -y wget git
+RUN apt-get update && apt-get install -y wget git qstat
 RUN useradd -Ms /bin/bash legacy
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
 WORKDIR /legacy/server

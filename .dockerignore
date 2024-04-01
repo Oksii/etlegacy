@@ -1,0 +1,7 @@
+# Ignore all files except Dockerfiles and entrypoint.sh
+*
+!Dockerfile.stable
+!Dockerfile.latest
+!entrypoint.sh
+!playercount.sh
+!README.md

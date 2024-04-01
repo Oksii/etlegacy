@@ -36,9 +36,13 @@ COPY --chown=legacy:legacy entrypoint.sh /legacy/server/start
 RUN chmod +x /legacy/server/start
 RUN mkdir /legacy/homepath
 
+# script to check playercounts for automated restarts
+COPY --chown=legacy:legacy playercount.sh /legacy/server/playercount
+RUN chmod +x /legacy/server/playercount
+
 # Final stage
 FROM debian:stable-slim
-RUN apt-get update && apt-get install -y wget git
+RUN apt-get update && apt-get install -y wget git qstat
 RUN useradd -Ms /bin/bash legacy
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
 WORKDIR /legacy/server
@@ -52,4 +56,4 @@ EXPOSE 27960/UDP
 
 # Switch to non-root user and set entrypoint
 USER legacy
-ENTRYPOINT ["./start"]74ae89653a2
+ENTRYPOINT ["./start"]

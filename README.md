@@ -9,6 +9,14 @@ While tag :stable is intended to be used for specific versions.
 Dockerfiles are referring static files for this purpose respectively: 
 "etlegacy-latest.tar.gz" and "etlegacy-stable.tar.gz"
 
+We've configured [watchtower](https://containrrr.dev/watchtower/) to accept 
+HTTP requests to trigger an update on running containers. 
+See example docker-compose file. 
+
+For that purpose we include a `playercount.sh` script inside the container, 
+this allows us to perform pre-update checks for activity on running containers.
+If playercount > 0 we skip restarting. 
+
 # ET:Legacy Match Server
 
 This Docker image will download the required ET:Legacy maps as specified in the
