@@ -38,7 +38,7 @@ jobs:
       - name: Check Domain Availability
         id: check_domain
         run: |
-          for domain in ${{ secrets.SERVER_URL_LIST }}; do
+          for domain in de.etl.lol uk.etl.lol nl.etl.lol it.etl.lol cup.etl.lol; do
             if curl --output /dev/null --silent --head --fail http://$domain:8080; then
               echo "::set-output name=domain::$domain"
               exit 0
