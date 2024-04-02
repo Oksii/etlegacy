@@ -98,3 +98,7 @@ Cleaning up temporary files
 Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0
 Snapshot: legacy_v2.82.0-38-gace61bc.pk3
  snapshot legacy_v2.82.0-38-gace61bc.pk3
+
+Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0
+ snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
+Commit Hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0
