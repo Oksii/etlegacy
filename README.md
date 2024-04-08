@@ -85,3 +85,5 @@ possible or create a custom `SETTINGSURL`.
 ### Build history
 
 Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0 snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
+
+Version change to hash: stable snapshot 2.82.0-36
