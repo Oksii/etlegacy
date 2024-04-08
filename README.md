@@ -47,6 +47,9 @@ docker run -d \
   -e "REFEREEPASSWORD=pass123" \
   oksii/etlegacy
 ```
+Version change to etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz || hash: ade91a75f3fb756a088f9a77d6c680d200158e68
+```
+```
 
 ## Configuration Options
 
