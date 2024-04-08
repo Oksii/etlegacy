@@ -122,3 +122,5 @@ Snapshot: legacy_v2.82.0-40-g5d6db16.pk3
 Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0 snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
 
 Version change to hash: ade91a75f3fb756a088f9a77d6c680d200158e68 snapshot etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz
+
+Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0 snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
