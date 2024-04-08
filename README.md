@@ -84,43 +84,4 @@ possible or create a custom `SETTINGSURL`.
 
 ### Build history
 
-Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0 snapshot legacy_v2.82.0-38-gace61bc.pk3
-
-
-Version change to hash: stable branch snapshot etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz
-
-Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0
-Snapshot: legacy_v2.82.0-38-gace61bc.pk3
-Cleaning up temporary files
- snapshot legacy_v2.82.0-38-gace61bc.pk3
-Cleaning up temporary files
-
-Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0
-Snapshot: legacy_v2.82.0-38-gace61bc.pk3
- snapshot legacy_v2.82.0-38-gace61bc.pk3
-
-Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0
- snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
-Commit Hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0
-
-Version change to hash: ade91a75f3fb756a088f9a77d6c680d200158e68 snapshot etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz
-
-Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0 snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
-
-Version change to hash: ade91a75f3fb756a088f9a77d6c680d200158e68 snapshot etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz
-
-Version change to hash: 5d6db169f5ec728236fda5cd592e356cf88fedd8
-Snapshot: legacy_v2.82.0-40-g5d6db16.pk3
- snapshot legacy_v2.82.0-40-g5d6db16.pk3
-
-
-Version change to hash: 5d6db169f5ec728236fda5cd592e356cf88fedd8
-Snapshot: legacy_v2.82.0-40-g5d6db16.pk3
- snapshot legacy_v2.82.0-40-g5d6db16.pk3
-
-
-Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0 snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
-
-Version change to hash: ade91a75f3fb756a088f9a77d6c680d200158e68 snapshot etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz
-
 Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0 snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
