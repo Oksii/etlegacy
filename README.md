@@ -84,10 +84,5 @@ possible or create a custom `SETTINGSURL`.
 
 ### Build history
 ```
-Version change to hash: ace61bc4a84869e3fe2a9a77d25835eac15ba4e0 snapshot etlegacy-v2.82.0-38-gace61bc-x86_64.tar.gz
-Version change to hash: stable snapshot 2.82.0-36
-Version change to hash: latest snapshot 2.82-0-49
-Version change to hash: 28fa3bb7be74b766f31cbdeacff866769f5f1dcd snapshot etlegacy-v2.82.0-49-g28fa3bb-x86_64.tar.gz
-Version change to etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz || hash: ade91a75f3fb756a088f9a77d6c680d200158e68
 Version change to etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz || hash: ade91a75f3fb756a088f9a77d6c680d200158e68
 ```
