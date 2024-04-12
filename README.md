@@ -87,4 +87,5 @@ possible or create a custom `SETTINGSURL`.
 Version change to etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz || hash: ade91a75f3fb756a088f9a77d6c680d200158e68
 Version change to etlegacy-v2.82.0-49-g28fa3bb-x86_64.tar.gz || hash: 28fa3bb7be74b766f31cbdeacff866769f5f1dcd
 Version change to etlegacy-v2.82.0-50-gdc1ac4a-x86_64.tar.gz || hash: dc1ac4a1f1bf9f974b2cf8e7a614679d0514c8cf[0m
+Version change to etlegacy-v2.82.0-58-g48087c6-x86_64.tar.gz || hash: 48087c66152fc81a1a13ba69fa918d8cbb1a10ce[0m
 ```
