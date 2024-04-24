@@ -15,8 +15,7 @@ ARG STATIC_URL_BASEGAME
 
 # Fetch and unpack the appropriate etlegacy version
 RUN mkdir -p /legacy/server/etmain/mapscripts && \
-    curl -SL "$STATIC_URL_STABLE" | tar xz -C /legacy/server --strip-components=1 && \
-    rm -rf /var/lib/apt/lists/*
+    curl -SL "$STATIC_URL_STABLE" | tar xz -C /legacy/server --strip-components=1
 
 # Rename etlded binary and associated script
 RUN mv /legacy/server/etlded.$(arch) /legacy/server/etlded && \
@@ -28,8 +27,7 @@ RUN curl -SL "$STATIC_URL_BASEGAME" -o /tmp/etmain.zip && \
     rm -f /tmp/etmain.zip
 
 # Clone legacy-config repository
-RUN git clone --depth 1 "https://github.com/Oksii/legacy-configs.git" /legacy/server/settings && \
-    rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 "https://github.com/Oksii/legacy-configs.git" /legacy/server/settings
 
 # Set up entrypoint script
 COPY --chown=legacy:legacy entrypoint.sh /legacy/server/start
@@ -37,12 +35,16 @@ RUN chmod +x /legacy/server/start
 RUN mkdir /legacy/homepath
 
 # script to check playercounts for automated restarts
-COPY --chown=legacy:legacy playercount.sh /legacy/server/playercount
-RUN chmod +x /legacy/server/playercount
+COPY --chown=legacy:legacy autorestart.sh /legacy/server/autorestart
+RUN chmod +x /legacy/server/autorestart
 
 # Final stage
 FROM debian:stable-slim
-RUN apt-get update && apt-get install -y wget git qstat
+RUN apt-get update && apt-get install -y wget git qstat cron
+RUN wget https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_amd64 && \
+    mv icecon_linux_amd64 /bin/icecon && \
+    chmod +x /bin/icecon
+
 RUN useradd -Ms /bin/bash legacy
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
 WORKDIR /legacy/server

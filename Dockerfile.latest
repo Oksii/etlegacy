@@ -35,12 +35,16 @@ RUN chmod +x /legacy/server/start
 RUN mkdir /legacy/homepath
 
 # script to check playercounts for automated restarts
-COPY --chown=legacy:legacy playercount.sh /legacy/server/playercount
-RUN chmod +x /legacy/server/playercount
+COPY --chown=legacy:legacy autorestart.sh /legacy/server/autorestart
+RUN chmod +x /legacy/server/autorestart
 
 # Final stage
 FROM debian:stable-slim
-RUN apt-get update && apt-get install -y wget git qstat
+RUN apt-get update && apt-get install -y wget git qstat cron
+RUN wget https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_amd64 && \
+    mv icecon_linux_amd64 /bin/icecon && \
+    chmod +x /bin/icecon
+
 RUN useradd -Ms /bin/bash legacy
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
 WORKDIR /legacy/server

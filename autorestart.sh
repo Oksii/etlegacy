@@ -18,5 +18,16 @@ if [ "$player_count" -gt 0 ]; then
     exit 1
 else
     echo "No players are currently active. Proceeding with update."
-    exit 0
+
+    # Issue the RCON command to quit the server
+    timeout 5 icecon "localhost:27960" "${RCONPASSWORD}" -c "quit"
+    exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
+        echo "RCON command issued successfully."
+        exit 0
+    else
+        echo "Failed to issue RCON command. Exiting."
+        exit 1
+    fi
 fi

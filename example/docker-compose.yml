@@ -11,7 +11,7 @@ services:
       - '27960:27960/udp'
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "com.centurylinklabs.watchtower.lifecycle.pre-update=/legacy/server/playercount"
+      - "com.centurylinklabs.watchtower.lifecycle.pre-update=/legacy/server/autorestart"
     stdin_open: true
     tty: true
     restart: unless-stopped

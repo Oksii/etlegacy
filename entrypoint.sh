@@ -17,9 +17,20 @@ CONF_SETTINGSGIT=${SETTINGSURL:-"https://github.com/Oksii/legacy-configs.git"}
 CONF_SETTINGSBRANCH=${SETTINGSBRANCH:-"main"}
 
 AUTO_UPDATE=${AUTO_UPDATE:-"true"}
+AUTO_RESTART=${AUTO_RESTART:-"true"}
+AUTO_RESTART_INTERVAL=${AUTO_RESTART_INTERVAL:-"120"}
 
 GAME_BASE="/legacy/server"
 SETTINGS_BASE="${GAME_BASE}/settings"
+
+# Check if the cron job already exists before adding it
+# if not add cron to run every $AUTO_RESTART_INTERVAL
+if [ "${AUTO_RESTART}" == "true" ]; then
+    if ! crontab -l | grep -q "/home/game/autorestart.sh"; then
+        echo "Setting up cron to run every ${AUTO_RESTART_INTERVAL} minutes"
+        (crontab -l 2>/dev/null; echo "*/${AUTO_RESTART_INTERVAL} * * * * /home/game/autorestart.sh") | crontab -
+    fi
+fi
 
 # Update the configs git directory
 if [ "${AUTO_UPDATE}" == "true" ]; then
