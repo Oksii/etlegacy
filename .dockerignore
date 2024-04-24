@@ -3,5 +3,5 @@
 !Dockerfile.stable
 !Dockerfile.latest
 !entrypoint.sh
-!playercount.sh
+!autorestart.sh
 !README.md
