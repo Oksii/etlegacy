@@ -26,9 +26,9 @@ SETTINGS_BASE="${GAME_BASE}/settings"
 # Check if the cron job already exists before adding it
 # if not add cron to run every $AUTO_RESTART_INTERVAL
 if [ "${AUTO_RESTART}" == "true" ]; then
-    if ! crontab -l | grep -q "/home/game/autorestart.sh"; then
+    if ! crontab -l | grep -q "/legacy/server/autorestart.sh"; then
         echo "Setting up cron to run every ${AUTO_RESTART_INTERVAL} minutes"
-        (crontab -l 2>/dev/null; echo "*/${AUTO_RESTART_INTERVAL} * * * * /home/game/autorestart.sh") | crontab -
+        (crontab -l 2>/dev/null; echo "*/${AUTO_RESTART_INTERVAL} * * * * /legacy/server/autorestart.sh") | crontab -
     fi
 fi
 
