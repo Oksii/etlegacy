@@ -16,7 +16,6 @@ ARG STATIC_URL_BASEGAME
 # Fetch and unpack the appropriate etlegacy version
 RUN mkdir -p /legacy/server/etmain/mapscripts && \
     curl -SL "$STATIC_URL_LATEST" | tar xz -C /legacy/server --strip-components=1 && \
-    rm -rf /var/lib/apt/lists/*
 
 # Rename etlded binary and associated script
 RUN mv /legacy/server/etlded.$(arch) /legacy/server/etlded && \
@@ -29,7 +28,6 @@ RUN curl -SL "$STATIC_URL_BASEGAME" -o /tmp/etmain.zip && \
 
 # Clone legacy-config repository
 RUN git clone --depth 1 "https://github.com/Oksii/legacy-configs.git" /legacy/server/settings && \
-    rm -rf /var/lib/apt/lists/*
 
 # Set up entrypoint script
 COPY --chown=legacy:legacy entrypoint.sh /legacy/server/start
