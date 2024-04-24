@@ -23,13 +23,12 @@ AUTO_RESTART_INTERVAL=${AUTO_RESTART_INTERVAL:-"120"}
 GAME_BASE="/legacy/server"
 SETTINGS_BASE="${GAME_BASE}/settings"
 
-# Check if the cron job already exists before adding it
-# if not add cron to run every $AUTO_RESTART_INTERVAL
+# Loop to run the autorestart script every AUTO_RESTART_INTERVAL minutes using Hypnos
 if [ "${AUTO_RESTART}" == "true" ]; then
-    if ! crontab -l | grep -q "/legacy/server/autorestart.sh"; then
-        echo "Setting up cron to run every ${AUTO_RESTART_INTERVAL} minutes"
-        (crontab -l 2>/dev/null; echo "*/${AUTO_RESTART_INTERVAL} * * * * /legacy/server/autorestart.sh") | crontab -
-    fi
+    while true; do
+        hypnos "*/${AUTO_RESTART_INTERVAL} * * * *" /legacy/server/autorestart &
+        sleep "${AUTO_RESTART_INTERVAL}m"
+    done
 fi
 
 # Update the configs git directory
