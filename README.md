@@ -86,9 +86,9 @@ possible or create a custom `SETTINGSURL`.
 ```
 Version change to etlegacy-v2.82.0-34-gade91a7-x86_64.tar.gz || hash: ade91a75f3fb756a088f9a77d6c680d200158e68
 Version change to etlegacy-v2.82.0-49-g28fa3bb-x86_64.tar.gz || hash: 28fa3bb7be74b766f31cbdeacff866769f5f1dcd
-Version change to etlegacy-v2.82.0-50-gdc1ac4a-x86_64.tar.gz || hash: dc1ac4a1f1bf9f974b2cf8e7a614679d0514c8cf[0m
-Version change to etlegacy-v2.82.0-58-g48087c6-x86_64.tar.gz || hash: 48087c66152fc81a1a13ba69fa918d8cbb1a10ce[0m
-Version change to etlegacy-v2.82.0-68-g2ae1f90-x86_64.tar.gz || hash: 2ae1f90dc50a68a49a475f9d11743b10cdac7b89[0m
-Version change to etlegacy-v2.82.0-71-gad6c5cf-x86_64.tar.gz || hash: ad6c5cfce623699c9106617678559d3c7b5025d5[0m
-Version change to etlegacy-v2.82.1-x86_64.tar.gz || hash: 1d1261573792c81bee5bcdb92d4ac76f[0m
+Version change to etlegacy-v2.82.0-50-gdc1ac4a-x86_64.tar.gz || hash: dc1ac4a1f1bf9f974b2cf8e7a614679d0514c8cf
+Version change to etlegacy-v2.82.0-58-g48087c6-x86_64.tar.gz || hash: 48087c66152fc81a1a13ba69fa918d8cbb1a10ce
+Version change to etlegacy-v2.82.0-68-g2ae1f90-x86_64.tar.gz || hash: 2ae1f90dc50a68a49a475f9d11743b10cdac7b89
+Version change to etlegacy-v2.82.0-71-gad6c5cf-x86_64.tar.gz || hash: ad6c5cfce623699c9106617678559d3c7b5025d5
+Version change to etlegacy-v2.82.1-x86_64.tar.gz || hash: 1d1261573792c81bee5bcdb92d4ac76f
 ```
