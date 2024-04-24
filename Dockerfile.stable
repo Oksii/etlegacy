@@ -45,11 +45,6 @@ RUN wget https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linu
     mv icecon_linux_amd64 /bin/icecon && \
     chmod +x /bin/icecon
 
-RUN wget https://github.com/transitorykris/hypnos/releases/download/1.0/hypnos-linux-amd64.tar.gz && \
-    tar -xvf hypnos-linux-amd64.tar.gz && \
-    mv hypnos /bin && \
-    rm -rf hypnos-linux-amd64.tar.gz
-
 RUN useradd -Ms /bin/bash legacy
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
 WORKDIR /legacy/server

@@ -17,19 +17,9 @@ CONF_SETTINGSGIT=${SETTINGSURL:-"https://github.com/Oksii/legacy-configs.git"}
 CONF_SETTINGSBRANCH=${SETTINGSBRANCH:-"main"}
 
 AUTO_UPDATE=${AUTO_UPDATE:-"true"}
-AUTO_RESTART=${AUTO_RESTART:-"true"}
-AUTO_RESTART_INTERVAL=${AUTO_RESTART_INTERVAL:-"120"}
 
 GAME_BASE="/legacy/server"
 SETTINGS_BASE="${GAME_BASE}/settings"
-
-# Loop to run the autorestart script every AUTO_RESTART_INTERVAL minutes using Hypnos
-if [ "${AUTO_RESTART}" == "true" ]; then
-    while true; do
-        hypnos "*/${AUTO_RESTART_INTERVAL} * * * *" /legacy/server/autorestart &
-        sleep "${AUTO_RESTART_INTERVAL}m"
-    done
-fi
 
 # Update the configs git directory
 if [ "${AUTO_UPDATE}" == "true" ]; then
