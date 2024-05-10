@@ -99,4 +99,5 @@ Version change to etlegacy-v2.82.1-22-g48dfda3-x86_64.tar.gz || hash: 48dfda3f23
 Version change to etlegacy-v2.82.1-23-g61fc087-x86_64.tar.gz || hash: 61fc087b5e938cbe6983b408607f11310f8a1679
 Version change to etlegacy-v2.82.1-26-ga82a203-x86_64.tar.gz || hash: a82a2036c4b225426108f6d875584a14aa5f9f4d
 Version change to etlegacy-v2.82.1-37-g6c052a6-x86_64.tar.gz || hash: 6c052a6d310dbc400ba7f2d3cd2b17ce2a745b46
+Version change to etlegacy-v2.82.1-38-g6cb533d-x86_64.tar.gz || hash: 6cb533d1c28eaa2bacab31b672a80f85f3bd9d5d
 ```
