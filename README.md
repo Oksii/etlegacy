@@ -106,12 +106,7 @@ Version change to etlegacy-v2.82.1-43-g6935de0-x86_64.tar.gz || hash: 6935de0c07
 Version change to etlegacy-v2.82.1-38-g6cb533d-x86_64.tar.gz || hash: 6cb533d1c28eaa2bacab31b672a80f85f3bd9d5d
 Version change to etlegacy-v2.82.1-43-g6935de0-x86_64.tar.gz || hash: 6935de0c07596db0fcbf9243999fb7ecc4e7a1b4
 Version change to etlegacy-v2.82.1-70-g52f1f5b-x86_64.tar.gz || hash: 52f1f5bb341a6e7c7e0f43b7fd6daa89548ffa3d
-Version change to etlegacy-v2.82.1-71-gac4b2de-x86_64.tar.gz || hash: ac4b2deeccd6cdbb9cea4e6ba87400dbf602ab87
-Version change to etlegacy-v2.82.1-74-g956e441-x86_64.tar.gz || hash: 956e441929d2f853ef4fbcbcf41799b253d3ab55
-Version change 2.82.1-71 || etlegacy-v2.82.1-71-gac4b2de-x86_64.tar.gz || hash: ac4b2deeccd6cdbb9cea4e6ba87400dbf602ab87
-Version change: 2.82.1-74 || etlegacy-v2.82.1-74-g956e441-x86_64.tar.gz || hash: 956e441929d2f853ef4fbcbcf41799b253d3ab55
-Version change: 2.82.1-74 || etlegacy-v2.82.1-74-g956e441-x86_64.tar.gz || hash: 956e441929d2f853ef4fbcbcf41799b253d3ab55
-Version change: 2.82.1-74 || etlegacy-v2.82.1-74-g956e441-x86_64.tar.gz || hash: 956e441929d2f853ef4fbcbcf41799b253d3ab55
+Version change: 2.82.1-71 || etlegacy-v2.82.1-71-gac4b2de-x86_64.tar.gz || hash: ac4b2deeccd6cdbb9cea4e6ba87400dbf602ab87
 Version change: 2.82.1-74 || etlegacy-v2.82.1-74-g956e441-x86_64.tar.gz || hash: 956e441929d2f853ef4fbcbcf41799b253d3ab55
 Version change: 2.82.1-80 || etlegacy-v2.82.1-80-g247d7fd-x86_64.tar.gz || hash: 247d7fd270a9ba8f1d4f8b4fff8b70c70e5d16c0
 ```
