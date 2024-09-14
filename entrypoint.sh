@@ -111,7 +111,7 @@ exec "${binary}" \
     +set sv_maxclients "${CONF_MAXCLIENTS}" \
     +set fs_basepath "${GAME_BASE}" \
     +set fs_homepath "/legacy/homepath" \
-    +set sv_tracker "et-tracker.etl.lol:4444" \
+    +set sv_tracker "3.126.132.73:4444" \
     +exec "etl_server.cfg" \
     +map "${CONF_STARTMAP}" \
     "${@}"
