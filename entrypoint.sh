@@ -15,6 +15,7 @@ CONF_TIMEOUTLIMIT=${TIMEOUTLIMIT:-1}
 CONF_SERVERCONF=${SERVERCONF:-"legacy6"}
 CONF_SETTINGSGIT=${SETTINGSURL:-"https://github.com/Oksii/legacy-configs.git"}
 CONF_SETTINGSBRANCH=${SETTINGSBRANCH:-"main"}
+CONF_SVTRACKER=${SVTRACKER:-"tracker.etl.lol:4444"}
 
 AUTO_UPDATE=${AUTO_UPDATE:-"true"}
 
@@ -109,9 +110,10 @@ binary="${GAME_BASE}/etlded"
 # Exec into the game
 exec "${binary}" \
     +set sv_maxclients "${CONF_MAXCLIENTS}" \
+    +set net_port "${CONF_PORT}" \
     +set fs_basepath "${GAME_BASE}" \
     +set fs_homepath "/legacy/homepath" \
-    +set sv_tracker "3.126.132.73:4444" \
+    +set sv_tracker "${CONF_SVTRACKER}" \
     +exec "etl_server.cfg" \
     +map "${CONF_STARTMAP}" \
     "${@}"
