@@ -58,6 +58,8 @@ REDIRECTURL          | URL of HTTP downloads          | https://index.example.co
 MAP_PORT             | Container port (internal)      | 27960
 MAXCLIENTS           | Maximum number of players      | 32
 AUTO_UPDATE          | Update configurations on restart? | Enabled, set to `false` to enable.
+MAP_PORT             | Interal Port Mapping           | 27960
+SVTRACKER            | Set sv_tracker endpoint        | tracker.etl.lol:4444
 SETTINGSURL          | The git URL (must be HTTP public) for the ETL settings repository. | https://github.com/Oksii/legacy-configs.git
 SETTINGSBRANCH       | The git branch for the ETL settings repository. | `main`
 
@@ -72,8 +74,6 @@ REFEREEPASSWORD      | Referee password.              | No password (disabled).
 SCPASSWORD           | Shoutcaster password.          | No password (disabled).
 HOSTNAME             | Server hostname.               | ET
 CONF_MOTD            | MOTD line on connect           | Empty.
-MAP_PORT             | Interal Port Mapping           | 27960
-SVTRACKER            | Set sv_tracker endpoint        | tracker.etl.lol:4444
 TIMEOUTLIMIT         | Maximum number of pauses per map side | 1
 SERVERCONF           | The value for RtcwPro's `g_customConfig` | `legacy6`.
 
