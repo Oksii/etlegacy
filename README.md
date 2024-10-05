@@ -58,9 +58,9 @@ REDIRECTURL          | URL of HTTP downloads          | https://index.example.co
 MAP_PORT             | Container port (internal)      | 27960
 MAXCLIENTS           | Maximum number of players      | 32
 AUTO_UPDATE          | Update configurations on restart? | Enabled, set to `false` to enable.
-MAP_PORT             | Interal Port Mapping           | 27960
 SVTRACKER            | Set sv_tracker endpoint        | tracker.etl.lol:4444
 SETTINGSURL          | The git URL (must be HTTP public) for the ETL settings repository. | https://github.com/Oksii/legacy-configs.git
+SETTINGSPAT          | Github PAT token for private repos | none
 SETTINGSBRANCH       | The git branch for the ETL settings repository. | `main`
 
 
@@ -108,9 +108,7 @@ Version change: 2.82.1-74 || etlegacy-v2.82.1-74-g956e441-x86_64.tar.gz || hash:
 Version change: 2.82.1-80 || etlegacy-v2.82.1-80-g247d7fd-x86_64.tar.gz || hash: 247d7fd270a9ba8f1d4f8b4fff8b70c70e5d16c0
 Version change: 2.82.1-83 || etlegacy-v2.82.1-83-g0624beb-x86_64.tar.gz || hash: 0624bebf691756b5fb05cba75cf1bf50dafebc00
 Version change: 2.82.1-86 || etlegacy-v2.82.1-86-g3921510-x86_64.tar.gz || hash: 39215108429b11ef7848fed84d6c5391d0691289
-Version change: 2.82.1-86 || etlegacy-v2.82.1-86-g3921510-x86_64.tar.gz || hash: 39215108429b11ef7848fed84d6c5391d0691289
 Version change: 2.82.1-96 || etlegacy-v2.82.1-96-gb3e34ce-x86_64.tar.gz || hash: b3e34cea85371f4c26a809c4f460e2250533dadf
-Version change: 2.82.1-102 || etlegacy-v2.82.1-102-g1d2692c-x86_64.tar.gz || hash: 1d2692c9b1b636ef7acaaa6ec54f3dc816f9d638
 Version change: 2.82.1-102 || etlegacy-v2.82.1-102-g1d2692c-x86_64.tar.gz || hash: 1d2692c9b1b636ef7acaaa6ec54f3dc816f9d638
 Version change: 2.82.1-124 || etlegacy-v2.82.1-124-gb4b47c7-x86_64.tar.gz || hash: b4b47c7ae8f2b839794f795049a82c4fc6a28292
 Version change: 2.82.1-96 || etlegacy-v2.82.1-96-gb3e34ce-x86_64.tar.gz || hash: b3e34cea85371f4c26a809c4f460e2250533dadf
@@ -121,10 +119,8 @@ Version change: 2.82.1-156 || etlegacy-v2.82.1-156-g609fdca-x86_64.tar.gz || has
 Version change: 2.82.1-219 || etlegacy-v2.82.1-219-ge963afd-x86_64.tar.gz || hash: e963afdc83c50db1df6761e6ede737171f6b2711
 Version change: 2.82.1-253 || etlegacy-v2.82.1-253-geb38490-x86_64.tar.gz || hash: eb384903d3a42b5583e8b24ce07de38ecc97d6f1
 Version change: 2.82.1-269 || etlegacy-v2.82.1-269-gcf348cb-x86_64.tar.gz || hash: cf348cb6ef5af6f71a877e627af69b594b586169
-Version change: 2.82.1-269 || etlegacy-v2.82.1-269-gcf348cb-x86_64.tar.gz || hash: cf348cb6ef5af6f71a877e627af69b594b586169
 Version change: 2.82.1-276 || etlegacy-v2.82.1-276-g457a1ae-x86_64.tar.gz || hash: 457a1ae0080bf8296ab4e9a61cf754241d5d1460
 Version change: 2.82.1-286 || etlegacy-v2.82.1-286-g0f31f07-x86_64.tar.gz || hash: 0f31f07ac2b2207499e1670ca5ef4370054a6995
-Version change: 2.82.1-287 || etlegacy-v2.82.1-287-g4e3ea51-x86_64.tar.gz || hash: 4e3ea515d3e2161d01c26202bf20f2251669cf69
 Version change: 2.82.1-287 || etlegacy-v2.82.1-287-g4e3ea51-x86_64.tar.gz || hash: 4e3ea515d3e2161d01c26202bf20f2251669cf69
 Version change: 2.82.1-291 || etlegacy-v2.82.1-291-gd8d0053-x86_64.tar.gz || hash: d8d00536b43dc4b092826ce7f65fdb76e6f4a261
 Version change: 2.82.1-294 || etlegacy-v2.82.1-294-gf765002-x86_64.tar.gz || hash: f76500248e78fcf9ec13827138c4976668a4cfa1
@@ -132,8 +128,6 @@ Version change: 2.82.1-296 || etlegacy-v2.82.1-296-g0944c67-x86_64.tar.gz || has
 Version change: 2.82.1-297 || etlegacy-v2.82.1-297-ga5de3cc-x86_64.tar.gz || hash: a5de3ccb510aa7615c8ef7e8e49622114f223430
 Version change: 2.82.1-219 || etlegacy-v2.82.1-219-ge963afd-x86_64.tar.gz || hash: e963afdc83c50db1df6761e6ede737171f6b2711
 Version change: 2.82.1-306 || etlegacy-v2.82.1-306-g7cf4f61-x86_64.tar.gz || hash: 7cf4f61cf1a9b79b75d1afe02d52afca991ec0bd
-Version change: 2.82.1-306 || etlegacy-v2.82.1-306-g7cf4f61-x86_64.tar.gz || hash: 7cf4f61cf1a9b79b75d1afe02d52afca991ec0bd
-Version change: 2.82.1-310 || etlegacy-v2.82.1-310-ge411806-x86_64.tar.gz || hash: e41180623b98125f99c0c83f283c67fea46d947b
 Version change: 2.82.1-310 || etlegacy-v2.82.1-310-ge411806-x86_64.tar.gz || hash: e41180623b98125f99c0c83f283c67fea46d947b
 Version change: 2.82.1-315 || etlegacy-v2.82.1-315-g23df723-x86_64.tar.gz || hash: 23df72370d60632c898b9a5e67f7547aa1afdf7c
 ```
