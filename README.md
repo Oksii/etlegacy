@@ -131,4 +131,5 @@ Version change: 2.82.1-306 || etlegacy-v2.82.1-306-g7cf4f61-x86_64.tar.gz || has
 Version change: 2.82.1-310 || etlegacy-v2.82.1-310-ge411806-x86_64.tar.gz || hash: e41180623b98125f99c0c83f283c67fea46d947b
 Version change: 2.82.1-315 || etlegacy-v2.82.1-315-g23df723-x86_64.tar.gz || hash: 23df72370d60632c898b9a5e67f7547aa1afdf7c
 Version change: 2.82.1-332 || etlegacy-v2.82.1-332-gb6727a9-x86_64.tar.gz || hash: b6727a981243f0aab23267dfe24d673714b36b99
+Version change: 2.82.1-333 || etlegacy-v2.82.1-333-g1569153-x86_64.tar.gz || hash: 1569153d2bd5dd084f78ff076206c5b38bcb73fd
 ```
