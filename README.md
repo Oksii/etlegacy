@@ -74,6 +74,10 @@ REFEREEPASSWORD      | Referee password.              | No password (disabled).
 SCPASSWORD           | Shoutcaster password.          | No password (disabled).
 HOSTNAME             | Server hostname.               | ET
 CONF_MOTD            | MOTD line on connect           | Empty.
+SVTRACKER            | Set sv_tracker endpoint        | tracker.etl.lol:4444
+SVAUTODEMO           | Enable/Disable autodemo record | 0 (disabled)
+SVETLTVMAXSLAVES     | sv_etltv_maxslaves             | 2
+SVETLTVPASSWORD      | sv_etltv_password              | SVETLTVPASSWORD
 TIMEOUTLIMIT         | Maximum number of pauses per map side | 1
 SERVERCONF           | The value for RtcwPro's `g_customConfig` | `legacy6`.
 
