@@ -12,6 +12,7 @@ RUN apt-get update && \
 # Define build arguments
 ARG STATIC_URL_LATEST
 ARG STATIC_URL_BASEGAME
+ARG STATIC_URL_COMMANDMAPS
 
 # Fetch and unpack the appropriate etlegacy version
 RUN mkdir -p /legacy/server/etmain/mapscripts && \
@@ -51,6 +52,9 @@ RUN wget https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linu
 RUN wget https://raw.githubusercontent.com/LuaDist/dkjson/master/dkjson.lua && \
     mkdir -p /legacy/server/legacy && \
     mv dkjson.lua /legacy/server/legacy/dkjson.lua
+
+# Fetch overhauled command maps
+RUN curl -SL "$STATIC_URL_COMMANDMAPS" -o /legacy/server/legacy/zzz_levelshots.pk3
 
 RUN useradd -Ms /bin/bash legacy
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
