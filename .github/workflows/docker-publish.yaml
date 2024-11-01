@@ -20,13 +20,23 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker Image (Latest)
-        run: docker build --no-cache --build-arg STATIC_URL_LATEST=${{ secrets.STATIC_URL_LATEST }} --build-arg STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }} -f Dockerfile.latest -t oksii/etlegacy:latest .
+        run: |
+          docker build --no-cache \
+            --build-arg STATIC_URL_LATEST=${{ secrets.STATIC_URL_LATEST }} \
+            --build-arg STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }} \
+            --build-arg STATIC_URL_COMMANDMAPS=${{ secrets.STATIC_URL_COMMANDMAPS }} \
+            -f Dockerfile.latest -t oksii/etlegacy:latest .
 
       - name: Push Docker Image (Latest)
         run: docker push oksii/etlegacy:latest
 
       - name: Build Docker Image (Stable)
-        run: docker build --no-cache --build-arg STATIC_URL_STABLE=${{ secrets.STATIC_URL_STABLE }} --build-arg STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }} -f Dockerfile.stable -t oksii/etlegacy:stable .
+        run: |
+          docker build --no-cache \
+            --build-arg STATIC_URL_STABLE=${{ secrets.STATIC_URL_STABLE }} \
+            --build-arg STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }} \
+            --build-arg STATIC_URL_COMMANDMAPS=${{ secrets.STATIC_URL_COMMANDMAPS }} \
+            -f Dockerfile.stable -t oksii/etlegacy:stable .
 
       - name: Push Docker Image (Stable)
         run: docker push oksii/etlegacy:stable
