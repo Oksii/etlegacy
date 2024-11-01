@@ -30,6 +30,10 @@ RUN curl -SL "$STATIC_URL_BASEGAME" -o /tmp/etmain.zip && \
 # Clone legacy-config repository
 RUN git clone --depth 1 "https://github.com/Oksii/legacy-configs.git" /legacy/server/settings
 
+# Fetch overhauled command maps
+RUN mkdir -p /legacy/server/legacy && \
+    curl -SL "$STATIC_URL_COMMANDMAPS" -o /legacy/server/legacy/zzz_levelshots.pk3
+
 # Set up entrypoint script
 COPY --chown=legacy:legacy entrypoint.sh /legacy/server/start
 RUN chmod +x /legacy/server/start
@@ -52,9 +56,6 @@ RUN wget https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linu
 RUN wget https://raw.githubusercontent.com/LuaDist/dkjson/master/dkjson.lua && \
     mkdir -p /legacy/server/legacy && \
     mv dkjson.lua /legacy/server/legacy/dkjson.lua
-
-# Fetch overhauled command maps
-RUN curl -SL "$STATIC_URL_COMMANDMAPS" -o /legacy/server/legacy/zzz_levelshots.pk3
 
 RUN useradd -Ms /bin/bash legacy
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
