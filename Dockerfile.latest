@@ -12,7 +12,6 @@ RUN apt-get update && \
 # Define build arguments
 ARG STATIC_URL_LATEST
 ARG STATIC_URL_BASEGAME
-ARG STATIC_URL_COMMANDMAPS
 
 # Fetch and unpack the appropriate etlegacy version
 RUN mkdir -p /legacy/server/etmain/mapscripts && \
@@ -29,10 +28,6 @@ RUN curl -SL "$STATIC_URL_BASEGAME" -o /tmp/etmain.zip && \
 
 # Clone legacy-config repository
 RUN git clone --depth 1 "https://github.com/Oksii/legacy-configs.git" /legacy/server/settings
-
-# Fetch overhauled command maps
-RUN mkdir -p /legacy/server/legacy && \
-    curl -SL "$STATIC_URL_COMMANDMAPS" -o /legacy/server/legacy/zzz_levelshots.pk3
 
 # Set up entrypoint script
 COPY --chown=legacy:legacy entrypoint.sh /legacy/server/start

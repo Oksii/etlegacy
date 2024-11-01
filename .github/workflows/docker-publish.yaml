@@ -24,7 +24,6 @@ jobs:
           docker build --no-cache \
             --build-arg STATIC_URL_LATEST=${{ secrets.STATIC_URL_LATEST }} \
             --build-arg STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }} \
-            --build-arg STATIC_URL_COMMANDMAPS=${{ secrets.STATIC_URL_COMMANDMAPS }} \
             -f Dockerfile.latest -t oksii/etlegacy:latest .
 
       - name: Push Docker Image (Latest)
@@ -35,7 +34,6 @@ jobs:
           docker build --no-cache \
             --build-arg STATIC_URL_STABLE=${{ secrets.STATIC_URL_STABLE }} \
             --build-arg STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }} \
-            --build-arg STATIC_URL_COMMANDMAPS=${{ secrets.STATIC_URL_COMMANDMAPS }} \
             -f Dockerfile.stable -t oksii/etlegacy:stable .
 
       - name: Push Docker Image (Stable)

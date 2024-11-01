@@ -93,6 +93,12 @@ for luascript in "${SETTINGS_BASE}/luascripts/"*.lua; do
     cp "${luascript}" "${GAME_BASE}/legacy/luascripts/"
 done
 
+# Copy command maps over 
+for commandmap in "${SETTINGS_BASE}/commandmaps/"*.pk3; do
+    [ -f "${commandmap}" ] || break
+    cp "${commandmap}" "${GAME_BASE}/legacy/"
+done
+
 # Only configs live within the config directory so we don't need to be careful
 # about just recreating this directory.
 rm -rf "${GAME_BASE}/etmain/configs/"
