@@ -147,4 +147,5 @@ Version change: 2.83.0     || etlegacy-v2.83.0-x86_64.tar.gz              || has
 Version change: 2.83.1     || etlegacy-v2.83.1-x86_64.tar.gz              || hash: 96610ba015e468b73cf3017d6d11ccc1
 Version change: 2.83.1-2 || etlegacy-v2.83.1-2-g039174c-x86_64.tar.gz || hash: 039174cb82de2172b64d6265e6c520ae9bfb7717
 Version change: 2.83.1-9 || etlegacy-v2.83.1-9-g043fa19-x86_64.tar.gz || hash: 043fa19510e570a15dfbe905f58f2ff55c79adc2
+Version change: 2.83.1-12 || etlegacy-v2.83.1-12-g2c26b58-x86_64.tar.gz || hash: 2c26b58b770f1f68f65d07240849ba0c631bcd4b
 ```
