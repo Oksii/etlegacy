@@ -65,20 +65,35 @@ download_maps() {
 
 # Copy assets
 copy_game_assets() {
-    local asset_types=("mapscripts/*.script" "luascripts/*.lua" "commandmaps/*.pk3")
-    local destinations=("etmain/mapscripts/" "legacy/luascripts/" "legacy/")
-
+    # Create required directories
+    mkdir -p "${GAME_BASE}/etmain/mapscripts/"
+    mkdir -p "${GAME_BASE}/legacy/luascripts/"
+    
     # Clean up existing mapscripts
-    rm -rf "${GAME_BASE}/etmain/mapscripts/"*
-
-    for i in "${!asset_types[@]}"; do
-        mkdir -p "${GAME_BASE}/${destinations[$i]}"
-        for asset in "${SETTINGS_BASE}/${asset_types[$i]}"; do
-            [ -f "${asset}" ] || continue
-            cp "${asset}" "${GAME_BASE}/${destinations[$i]}"
-        done
+    for mapscript in "${GAME_BASE}/etmain/mapscripts/"*.script; do
+        [ -f "${mapscript}" ] || break
+        rm -rf "${mapscript}"
     done
-
+    
+    # Copy mapscripts
+    for mapscript in "${SETTINGS_BASE}/mapscripts/"*.script; do
+        [ -f "${mapscript}" ] || break
+        cp "${mapscript}" "${GAME_BASE}/etmain/mapscripts/"
+    done
+    
+    # Copy luascripts
+    for luascript in "${SETTINGS_BASE}/luascripts/"*.lua; do
+        [ -f "${luascript}" ] || break
+        cp "${luascript}" "${GAME_BASE}/legacy/luascripts/"
+    done
+    
+    # Copy command maps
+    for commandmap in "${SETTINGS_BASE}/commandmaps/"*.pk3; do
+        [ -f "${commandmap}" ] || break
+        cp "${commandmap}" "${GAME_BASE}/legacy/"
+    done
+    
+    # Handle configs
     rm -rf "${GAME_BASE}/etmain/configs/"
     mkdir -p "${GAME_BASE}/etmain/configs/"
     cp "${SETTINGS_BASE}/configs/"*.config "${GAME_BASE}/etmain/configs/" 2>/dev/null || true
