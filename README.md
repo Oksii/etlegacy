@@ -77,7 +77,7 @@ CONF_MOTD            | MOTD line on connect           | Empty.
 SVTRACKER            | Set sv_tracker endpoint        | tracker.etl.lol:4444
 SVAUTODEMO           | Enable/Disable autodemo record | 0 (disabled)
 SVETLTVMAXSLAVES     | sv_etltv_maxslaves             | 2
-SVETLTVPASSWORD      | sv_etltv_password              | SVETLTVPASSWORD
+SVETLTVPASSWORD      | sv_etltv_password              | 3tltv
 TIMEOUTLIMIT         | Maximum number of pauses per map side | 1
 SERVERCONF           | The value for RtcwPro's `g_customConfig` | `legacy6`.
 ADDITIONAL_CLI_ARGS  | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | None.
