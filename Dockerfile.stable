@@ -3,66 +3,62 @@ ENV DEBIAN_FRONTEND noninteractive
 
 # Install dependencies
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
         curl \
         git \
         unzip \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Define build arguments
 ARG STATIC_URL_STABLE
 ARG STATIC_URL_BASEGAME
+WORKDIR /legacy/server
 
-# Fetch and unpack the appropriate etlegacy version
-RUN mkdir -p /legacy/server/etmain/mapscripts && \
-    curl -SL "$STATIC_URL_STABLE" | tar xz -C /legacy/server --strip-components=1
+# Download and setup ET Legacy in a single layer
+RUN mkdir -p etmain/mapscripts && \
+    curl -SL "$STATIC_URL_STABLE" | tar xz --strip-components=1 && \
+    mv etlded.$(arch) etlded && \
+    mv etlded_bot.$(arch).sh etlded_bot.sh && \
+    curl -SL "$STATIC_URL_BASEGAME" -o /tmp/etmain.zip && \
+    unzip -q -d etmain /tmp/etmain.zip && \
+    rm -f /tmp/etmain.zip && \
+    git clone --depth 1 --single-branch "https://github.com/Oksii/legacy-configs.git" settings && \
+    mkdir -p /legacy/homepath
 
-# Rename etlded binary and associated script
-RUN mv /legacy/server/etlded.$(arch) /legacy/server/etlded && \
-    mv /legacy/server/etlded_bot.$(arch).sh /legacy/server/etlded_bot.sh
-
-# Fetch and unpack etmain files
-RUN curl -SL "$STATIC_URL_BASEGAME" -o /tmp/etmain.zip && \
-    unzip -d /legacy/server/etmain /tmp/etmain.zip && \
-    rm -f /tmp/etmain.zip
-
-# Clone legacy-config repository
-RUN git clone --depth 1 "https://github.com/Oksii/legacy-configs.git" /legacy/server/settings
-
-# Set up entrypoint script
-COPY --chown=legacy:legacy entrypoint.sh /legacy/server/start
-RUN chmod +x /legacy/server/start
-RUN mkdir /legacy/homepath
-
-# script to check playercounts for automated restarts
-COPY --chown=legacy:legacy autorestart.sh /legacy/server/autorestart
-RUN chmod +x /legacy/server/autorestart
+# Copy and prepare scripts
+COPY --chmod=755 entrypoint.sh ./start
+COPY --chmod=755 autorestart.sh ./autorestart
 
 # Final stage
 FROM debian:stable-slim
-RUN apt-get update && apt-get install -y wget git qstat curl
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Download icecon
-RUN wget https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_amd64 && \
-    mv icecon_linux_amd64 /bin/icecon && \
-    chmod +x /bin/icecon
-
-# Download dkjson.lua
-RUN wget https://raw.githubusercontent.com/LuaDist/dkjson/master/dkjson.lua && \
+# Install runtime dependencies and tools in a single layer
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        wget \
+        git \
+        qstat \
+        curl \
+        ca-certificates \
+    && wget -q https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_amd64 -O /bin/icecon && \
+    chmod +x /bin/icecon && \
     mkdir -p /legacy/server/legacy && \
-    mv dkjson.lua /legacy/server/legacy/dkjson.lua
+    wget -q https://raw.githubusercontent.com/LuaDist/dkjson/master/dkjson.lua -O /legacy/server/legacy/dkjson.lua && \
+    rm -rf /var/lib/apt/lists/* && \
+    useradd -Ms /bin/bash legacy
 
-RUN useradd -Ms /bin/bash legacy
+# Copy files from builder stage
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
+
+# Configure volumes and working directory
+VOLUME ["/legacy/homepath", "/legacy/server/etmain"]
 WORKDIR /legacy/server
 
-# Set up volumes
-VOLUME /legacy/homepath
-VOLUME /legacy/server/etmain
-
-# Expose port
+# Expose port and set user
 EXPOSE 27960/UDP
-
-# Switch to non-root user and set entrypoint
 USER legacy
+
+# Set entrypoint
 ENTRYPOINT ["./start"]

@@ -1,137 +1,140 @@
 #!/bin/bash
 
-# Set config defaults
-CONF_REDIR=${REDIRECTURL:-""}
-CONF_REDIR=${REDIRECTURL:-""}
-CONF_PORT=${MAP_PORT:-27960}
-CONF_STARTMAP=${STARTMAP:-radar}
-CONF_HOSTNAME=${HOSTNAME:-ET}
-CONF_MAXCLIENTS=${MAXCLIENTS:-32}
-CONF_PASSWORD=${PASSWORD:-""}
-CONF_RCONPASSWORD=${RCONPASSWORD:-""}
-CONF_REFPASSWORD=${REFEREEPASSWORD:-""}
-CONF_SVAUTODEMO=${SVAUTODEMO:-"0"}
-CONF_ETLTVMAXSLAVES=${SVETLTVMAXSLAVES:-"2"}
-CONF_ETLTVPASSWORD=${SVETLTVPASSWORD:-"SVETLTVPASSWORD"}
-CONF_SCPASSWORD=${SCPASSWORD:-""}
-CONF_TIMEOUTLIMIT=${TIMEOUTLIMIT:-1}
-CONF_SERVERCONF=${SERVERCONF:-"legacy6"}
-CONF_SETTINGSGIT=${SETTINGSURL:-"https://github.com/Oksii/legacy-configs.git"}
-CONF_SETTINGSGITPAT=${SETTINGSPAT:-""}
-CONF_SETTINGSBRANCH=${SETTINGSBRANCH:-"main"}
-CONF_SVTRACKER=${SVTRACKER:-"tracker.etl.lol:4444"}
-
-AUTO_UPDATE=${AUTO_UPDATE:-"true"}
-
+# Base directories
 GAME_BASE="/legacy/server"
 SETTINGS_BASE="${GAME_BASE}/settings"
 
-# Update the configs git directory
-if [ "${AUTO_UPDATE}" == "true" ]; then
-    echo "Checking if any configuration updates exist to pull"
+# Config defaults
+declare -A CONF=(
+    [REDIRECTURL]="${REDIRECTURL:-}"
+    [MAP_PORT]="${MAP_PORT:-27960}"
+    [STARTMAP]="${STARTMAP:-radar}"
+    [HOSTNAME]="${HOSTNAME:-ET}"
+    [MAXCLIENTS]="${MAXCLIENTS:-32}"
+    [PASSWORD]="${PASSWORD:-}"
+    [RCONPASSWORD]="${RCONPASSWORD:-}"
+    [REFEREEPASSWORD]="${REFEREEPASSWORD:-}"
+    [SVAUTODEMO]="${SVAUTODEMO:-0}"
+    [SVETLTVMAXSLAVES]="${SVETLTVMAXSLAVES:-2}"
+    [SVETLTVPASSWORD]="${SVETLTVPASSWORD:-SVETLTVPASSWORD}"
+    [SCPASSWORD]="${SCPASSWORD:-}"
+    [TIMEOUTLIMIT]="${TIMEOUTLIMIT:-1}"
+    [SERVERCONF]="${SERVERCONF:-legacy6}"
+    [SETTINGSURL]="${SETTINGSURL:-https://github.com/Oksii/legacy-configs.git}"
+    [SETTINGSPAT]="${SETTINGSPAT:-}"
+    [SETTINGSBRANCH]="${SETTINGSBRANCH:-main}"
+    [SVTRACKER]="${SVTRACKER:-}"
+)
 
-    # If CONF_SETTINGSPAT is not empty, use it for authentication
-    if [ -n "${CONF_SETTINGSGITPAT}" ]; then
-        AUTH_URL="https://${CONF_SETTINGSGITPAT}@$(echo "${CONF_SETTINGSGIT}" | sed 's~https://~~g')"
-    else
-        AUTH_URL="${CONF_SETTINGSGIT}"
+# Fetch configs from repo
+update_configs() {
+    echo "Checking for configuration updates..."
+    local auth_url="${CONF[SETTINGSURL]}"
+    
+    if [ -n "${CONF[SETTINGSPAT]}" ]; then
+        auth_url="https://${CONF[SETTINGSPAT]}@$(echo "${CONF[SETTINGSURL]}" | sed 's~https://~~g')"
     fi
 
-    if git clone --depth 1 --single-branch --branch "${CONF_SETTINGSBRANCH}" "${AUTH_URL}" "${SETTINGS_BASE}.new"; then
+    if git clone --depth 1 --single-branch --branch "${CONF[SETTINGSBRANCH]}" "${auth_url}" "${SETTINGS_BASE}.new"; then
         rm -rf "${SETTINGS_BASE}"
         mv "${SETTINGS_BASE}.new" "${SETTINGS_BASE}"
     else
-        echo "Configuration repo could not be pulled," \
-            "using latest pulled version"
+        echo "Configuration repo could not be pulled, using latest pulled version"
     fi
-fi
+}
 
-declare -A default_maps=(
-)
+# Handle map downloads
+download_maps() {
+    IFS=':' read -ra MAP_ARRAY <<< "$MAPS"
+    for map in "${MAP_ARRAY[@]}"; do
+        [ -f "${GAME_BASE}/etmain/${map}.pk3" ] && continue
 
-# Iterate over all maps and download them if necessary
-export IFS=":"
-for map in $MAPS; do
-    if [ -n "${default_maps[$map]}" ]; then
-        echo "${map} is a default map so we will not attempt to download"
-        continue
-    fi
-
-    if [ ! -f "${GAME_BASE}/etmain/${map}.pk3" ]; then
         echo "Attempting to download ${map}"
         if [ -f "/maps/${map}.pk3" ]; then
             echo "Map ${map} is sourcable locally, copying into place"
-            cp "/maps/${map}.pk3" "${GAME_BASE}/etmain/${map}.pk3.tmp"
+            cp "/maps/${map}.pk3" "${GAME_BASE}/etmain/${map}.pk3"
         else
-            # TODO: We make no effort to ensure this was successful, maybe we
-            # should attempt to retry or at the very least try and skip the
-            # mutations that happen further on in the loop.
-            wget -O "${GAME_BASE}/etmain/${map}.pk3.tmp" "${CONF_REDIR}/etmain/$map.pk3"
+            wget -O "${GAME_BASE}/etmain/${map}.pk3" "${CONF[REDIRECTURL]}/etmain/${map}.pk3" || {
+                echo "Failed to download ${map}"
+                rm -f "${GAME_BASE}/etmain/${map}.pk3"
+                continue
+            }
         fi
+    done
+}
 
-        mv "${GAME_BASE}/etmain/${map}.pk3.tmp" "${GAME_BASE}/etmain/${map}.pk3"
+# Copy assets
+copy_game_assets() {
+    local asset_types=("mapscripts/*.script" "luascripts/*.lua" "commandmaps/*.pk3")
+    local destinations=("etmain/mapscripts/" "legacy/luascripts/" "legacy/")
+
+    # Clean up existing mapscripts
+    rm -rf "${GAME_BASE}/etmain/mapscripts/"*
+
+    for i in "${!asset_types[@]}"; do
+        mkdir -p "${GAME_BASE}/${destinations[$i]}"
+        for asset in "${SETTINGS_BASE}/${asset_types[$i]}"; do
+            [ -f "${asset}" ] || continue
+            cp "${asset}" "${GAME_BASE}/${destinations[$i]}"
+        done
+    done
+
+    rm -rf "${GAME_BASE}/etmain/configs/"
+    mkdir -p "${GAME_BASE}/etmain/configs/"
+    cp "${SETTINGS_BASE}/configs/"*.config "${GAME_BASE}/etmain/configs/" 2>/dev/null || true
+}
+
+# Update server.cfg with CONF vars
+update_server_config() {
+    cp "${SETTINGS_BASE}/etl_server.cfg" "${GAME_BASE}/etmain/etl_server.cfg"
+    
+    # Set g_needpass if password is configured
+    if [ -n "${CONF[PASSWORD]}" ]; then
+        echo 'set g_needpass "1"' >> "${GAME_BASE}/etmain/etl_server.cfg"
     fi
 
-    rm -rf "${GAME_BASE}/tmp/"
-done
+    # Replace all configuration placeholders
+    for key in "${!CONF[@]}"; do
+        value=$(echo "${CONF[$key]}" | sed 's/\//\\\//g')
+        sed -i "s/%CONF_${key}%/${value}/g" "${GAME_BASE}/etmain/etl_server.cfg"
+    done
+    
+    # Clean up any remaining unreplaced placeholders
+    sed -i 's/%CONF_[A-Z]*%//g' "${GAME_BASE}/etmain/etl_server.cfg"
 
-# We need to cleanup mapscripts on every invokation as we don't know what is
-# going to exist in the settings directory.
-for mapscript in "${GAME_BASE}/etmain/mapscripts/"*.script; do
-    [ -f "${mapscript}" ] || break
-    rm -rf "${mapscript}"
-done
+    # Append extra configuration if it exists
+    [ -f "${GAME_BASE}/extra.cfg" ] && cat "${GAME_BASE}/extra.cfg" >> "${GAME_BASE}/etmain/etl_server.cfg"
+}
 
-for mapscript in "${SETTINGS_BASE}/mapscripts/"*.script; do
-    [ -f "${mapscript}" ] || break
-    cp "${mapscript}" "${GAME_BASE}/etmain/mapscripts/"
-done
+# Parse additional CLI arguments
+parse_cli_args() {
+    local args=()
+    local IFS=$' \t\n'
+    
+    # If ADDITIONAL_CLI_ARGS is empty, return empty array
+    [ -z "${ADDITIONAL_CLI_ARGS:-}" ] && echo "${args[@]}" && return
 
-# Copy luascripts over 
-for luascript in "${SETTINGS_BASE}/luascripts/"*.lua; do
-    [ -f "${luascript}" ] || break
-    cp "${luascript}" "${GAME_BASE}/legacy/luascripts/"
-done
+    # Read the string into an array maintaining quotes
+    eval "args=($ADDITIONAL_CLI_ARGS)"
+    echo "${args[@]}"
+}
 
-# Copy command maps over 
-for commandmap in "${SETTINGS_BASE}/commandmaps/"*.pk3; do
-    [ -f "${commandmap}" ] || break
-    cp "${commandmap}" "${GAME_BASE}/legacy/"
-done
+# Main
+[ "${AUTO_UPDATE:-true}" = "true" ] && update_configs
+download_maps
+copy_game_assets
+update_server_config
 
-# Only configs live within the config directory so we don't need to be careful
-# about just recreating this directory.
-rm -rf "${GAME_BASE}/etmain/configs/"
-mkdir -p "${GAME_BASE}/etmain/configs/"
-cp "${SETTINGS_BASE}/configs/"*.config "${GAME_BASE}/etmain/configs/"
+ADDITIONAL_ARGS=($(parse_cli_args))
 
-# We need to set g_needpass if a password is set
-if [ "${CONF_PASSWORD}" != "" ]; then
-    CONF_NEEDPASS='set g_needpass "1"'
-fi
-
-# Iterate over all config variables and write them in place
-cp "${SETTINGS_BASE}/etl_server.cfg" "${GAME_BASE}/etmain/etl_server.cfg"
-for var in "${!CONF_@}"; do
-    value=$(echo "${!var}" | sed 's/\//\\\//g')
-    sed -i "s/%${var}%/${value}/g" "${GAME_BASE}/etmain/etl_server.cfg"
-done
-sed -i "s/%CONF_[A-Z]*%//g" "${GAME_BASE}/etmain/etl_server.cfg"
-
-# Append extra.cfg if it exists
-if [ -f "${GAME_BASE}/extra.cfg" ]; then
-    cat "${GAME_BASE}/extra.cfg" >> "${GAME_BASE}/etmain/etl_server.cfg"
-fi
-# Rtcwpro uses a different binary which is provided in their package
-binary="${GAME_BASE}/etlded"
-
-# Exec into the game
-exec "${binary}" \
-    +set sv_maxclients "${CONF_MAXCLIENTS}" \
-    +set net_port "${CONF_PORT}" \
+# Start the game server
+exec "${GAME_BASE}/etlded" \
+    +set sv_maxclients "${CONF[MAXCLIENTS]}" \
+    +set net_port "${CONF[MAP_PORT]}" \
     +set fs_basepath "${GAME_BASE}" \
     +set fs_homepath "/legacy/homepath" \
-    +set sv_tracker "${CONF_SVTRACKER}" \
+    +set sv_tracker "${CONF[SVTRACKER]}" \
     +exec "etl_server.cfg" \
-    +map "${CONF_STARTMAP}" \
-    "${@}"
+    +map "${CONF[STARTMAP]}" \
+    "${ADDITIONAL_ARGS[@]}" \
+    "$@"

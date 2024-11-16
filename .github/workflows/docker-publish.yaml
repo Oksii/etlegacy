@@ -4,63 +4,84 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - type: latest
+            dockerfile: Dockerfile.latest
+            url_arg: STATIC_URL_LATEST
+            tag: latest
+          - type: stable
+            dockerfile: Dockerfile.stable
+            url_arg: STATIC_URL_STABLE
+            tag: stable
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4  # Update to use Node.js 20
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3  # Update to use Node.js 20
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build Docker Image (Latest)
-        run: |
-          docker build --no-cache \
-            --build-arg STATIC_URL_LATEST=${{ secrets.STATIC_URL_LATEST }} \
-            --build-arg STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }} \
-            -f Dockerfile.latest -t oksii/etlegacy:latest .
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: oksii/etlegacy
+          tags: |
+            type=raw,value=${{ matrix.tag }}
+            type=sha,prefix=${{ matrix.tag }}-
 
-      - name: Push Docker Image (Latest)
-        run: docker push oksii/etlegacy:latest
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=registry,ref=oksii/etlegacy:${{ matrix.tag }}
+          cache-to: type=inline
+          build-args: |
+            ${{ matrix.url_arg }}=${{ secrets.STATIC_URL_LATEST }}
+            STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }}
 
-      - name: Build Docker Image (Stable)
-        run: |
-          docker build --no-cache \
-            --build-arg STATIC_URL_STABLE=${{ secrets.STATIC_URL_STABLE }} \
-            --build-arg STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }} \
-            -f Dockerfile.stable -t oksii/etlegacy:stable .
-
-      - name: Push Docker Image (Stable)
-        run: docker push oksii/etlegacy:stable
- 
-  send-api-request:
+  notify-watchtower:
+    needs: build-and-push
     runs-on: ubuntu-latest
-    needs: [build-and-push]
     steps:
       - name: Check Domain Availability
-        id: check_domain
+        id: check-domains
         run: |
-          reachable_domains=()
+          reachable=()
           for domain in ${{ secrets.SERVER_URL_LIST }}; do
-            if nc -z -w 1 $domain 8080 &> /dev/null; then
-              reachable_domains+=("$domain")
+            if timeout 5 bash -c "nc -z -w 1 $domain 8080" 2>/dev/null; then
+              reachable+=("$domain")
             fi
           done
-          if [ ${#reachable_domains[@]} -eq 0 ]; then
-            echo "No reachable domains found."
-            exit 0  # Exit successfully if no reachable domains found
-          else
-            echo "::set-output name=reachable_domains::${reachable_domains[*]}"
+          if [ ${#reachable[@]} -gt 0 ]; then
+            echo "domains=${reachable[*]}" >> $GITHUB_OUTPUT
           fi
-      - name: Send HTTP API Request
-        if: steps.check_domain.outputs.reachable_domains
+
+      - name: Notify Watchtower
+        if: steps.check-domains.outputs.domains
         run: |
-          for domain in ${{ steps.check_domain.outputs.reachable_domains }}; do
-            curl -X POST -H "Authorization: Bearer ${{ secrets.WATCHTOWER_API_TOKEN }}" http://$domain:8080/v1/update
+          for domain in ${{ steps.check-domains.outputs.domains }}; do
+            curl -m 10 -X POST \
+              -H "Authorization: Bearer ${{ secrets.WATCHTOWER_API_TOKEN }}" \
+              "http://$domain:8080/v1/update" || true
           done
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true

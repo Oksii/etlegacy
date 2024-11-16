@@ -58,9 +58,9 @@ REDIRECTURL          | URL of HTTP downloads          | https://index.example.co
 MAP_PORT             | Container port (internal)      | 27960
 MAXCLIENTS           | Maximum number of players      | 32
 AUTO_UPDATE          | Update configurations on restart? | Enabled, set to `false` to enable.
-SVTRACKER            | Set sv_tracker endpoint        | tracker.etl.lol:4444
+SVTRACKER            | Set sv_tracker endpoint        | None
 SETTINGSURL          | The git URL (must be HTTP public) for the ETL settings repository. | https://github.com/Oksii/legacy-configs.git
-SETTINGSPAT          | Github PAT token for private repos | none
+SETTINGSPAT          | Github PAT token for private repos | None
 SETTINGSBRANCH       | The git branch for the ETL settings repository. | `main`
 
 
@@ -80,6 +80,7 @@ SVETLTVMAXSLAVES     | sv_etltv_maxslaves             | 2
 SVETLTVPASSWORD      | sv_etltv_password              | SVETLTVPASSWORD
 TIMEOUTLIMIT         | Maximum number of pauses per map side | 1
 SERVERCONF           | The value for RtcwPro's `g_customConfig` | `legacy6`.
+ADDITIONAL_CLI_ARGS  | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | None.
 
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
