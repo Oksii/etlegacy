@@ -53,7 +53,7 @@ jobs:
           cache-from: type=registry,ref=oksii/etlegacy:${{ matrix.tag }}
           cache-to: type=inline
           build-args: |
-            ${{ matrix.url_arg }}=${{ secrets.STATIC_URL_LATEST }}
+            ${{ matrix.url_arg }}=${{ secrets[matrix.url_arg] }}
             STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }}
 
   notify-watchtower:
