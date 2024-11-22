@@ -50,8 +50,6 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          # Removed cache-from to avoid using any cached layers
-          cache-to: type=none
           build-args: |
             ${{ matrix.url_arg }}=${{ secrets[matrix.url_arg] }}
             STATIC_URL_BASEGAME=${{ secrets.STATIC_URL_BASEGAME }}
