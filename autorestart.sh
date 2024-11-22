@@ -39,5 +39,5 @@ if [ "$player_count" -le 2 ]; then
     fi
 else
     echo "More than 2 players active ($player_count players). Exiting without update."
-    exit 0
+    exit 1
 fi
