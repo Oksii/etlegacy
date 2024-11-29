@@ -157,4 +157,5 @@ Version change: 2.83.1-33 || etlegacy-v2.83.1-33-geeb4cb7-x86_64.tar.gz || hash:
 Version change: 2.83.1-33 || etlegacy-v2.83.1-33-geeb4cb7-x86_64.tar.gz || hash: eeb4cb7de15cbc5f337b29588a61a579b338d62d
 Version change: 2.83.1-34 || etlegacy-v2.83.1-34-ga127043-x86_64.tar.gz || hash: a127043f0f404abc2e872816f7d0204f68aa71ad
 Version change: 2.83.1-34 || etlegacy-v2.83.1-34-ga127043-x86_64.tar.gz || hash: a127043f0f404abc2e872816f7d0204f68aa71ad
+Version change: 2.83.1-35 || etlegacy-v2.83.1-35-g0ef228a-x86_64.tar.gz || hash: 0ef228a7cfb340ee93fb3f0c6dd0c9d46362878f
 ```
