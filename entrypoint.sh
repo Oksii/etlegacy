@@ -24,6 +24,8 @@ declare -A CONF=(
     [SETTINGSPAT]="${SETTINGSPAT:-}"
     [SETTINGSBRANCH]="${SETTINGSBRANCH:-main}"
     [SVTRACKER]="${SVTRACKER:-}"
+    [XMAS]="${XMAS:-false}"
+    [XMAS_URL]="${XMAS_URL:-}"
 )
 
 # Fetch configs from repo
@@ -121,6 +123,18 @@ update_server_config() {
     [ -f "${GAME_BASE}/extra.cfg" ] && cat "${GAME_BASE}/extra.cfg" >> "${GAME_BASE}/etmain/etl_server.cfg"
 }
 
+# Download XMAS content if enabled
+handle_xmas_content() {
+    [ "${CONF[XMAS]}" = "true" ] || return 0
+    
+    local xmas_file="${GAME_BASE}/legacy/z_xmas.pk3"
+    [ -f "$xmas_file" ] && return 0
+    
+    echo "Downloading XMAS assets..."
+    wget -q --show-progress -O "$xmas_file" "${CONF[XMAS_URL]}" ||
+        { rm -f "$xmas_file"; echo "WARNING: Failed to download XMAS assets"; return 1; }
+}
+
 # Parse additional CLI arguments
 parse_cli_args() {
     local args=()
@@ -139,6 +153,7 @@ parse_cli_args() {
 download_maps
 copy_game_assets
 update_server_config
+handle_xmas_content
 
 ADDITIONAL_ARGS=($(parse_cli_args))
 
