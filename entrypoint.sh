@@ -3,30 +3,77 @@
 # Base directories
 GAME_BASE="/legacy/server"
 SETTINGS_BASE="${GAME_BASE}/settings"
+ETMAIN_DIR="${GAME_BASE}/etmain"
+LEGACY_DIR="${GAME_BASE}/legacy"
+HOMEPATH="/legacy/homepath"
+
+# Helper functions for common operations
+log_info() {
+    echo "$1"
+}
+
+log_warning() {
+    echo "WARNING: $1"
+}
+
+ensure_directory() {
+    mkdir -p "$1"
+}
+
+safe_copy() {
+    local src="$1"
+    local dest="$2"
+    [ -f "$src" ] && cp -f "$src" "$dest"
+}
 
 # Config defaults
 declare -A CONF=(
-    [REDIRECTURL]="${REDIRECTURL:-}"
-    [MAP_PORT]="${MAP_PORT:-27960}"
-    [STARTMAP]="${STARTMAP:-radar}"
+    # Server settings
     [HOSTNAME]="${HOSTNAME:-ET}"
+    [MAP_PORT]="${MAP_PORT:-27960}"
+    [REDIRECTURL]="${REDIRECTURL:-}"
     [MAXCLIENTS]="${MAXCLIENTS:-32}"
+    [STARTMAP]="${STARTMAP:-radar}"
+    [TIMEOUTLIMIT]="${TIMEOUTLIMIT:-1}"
+    [SERVERCONF]="${SERVERCONF:-legacy6}"
+    [SVTRACKER]="${SVTRACKER:-}"
+
+    # Passwords
     [PASSWORD]="${PASSWORD:-}"
     [RCONPASSWORD]="${RCONPASSWORD:-}"
     [REFPASSWORD]="${REFPASSWORD:-}"
+    [SCPASSWORD]="${SCPASSWORD:-}"
+    
+    # ETLTV
     [SVAUTODEMO]="${SVAUTODEMO:-0}"
     [ETLTVMAXSLAVES]="${SVETLTVMAXSLAVES:-2}"
     [ETLTVPASSWORD]="${SVETLTVPASSWORD:-3tltv}"
-    [SCPASSWORD]="${SCPASSWORD:-}"
-    [TIMEOUTLIMIT]="${TIMEOUTLIMIT:-1}"
-    [SERVERCONF]="${SERVERCONF:-legacy6}"
+    
+    # Repository
     [SETTINGSURL]="${SETTINGSURL:-https://github.com/Oksii/legacy-configs.git}"
     [SETTINGSPAT]="${SETTINGSPAT:-}"
     [SETTINGSBRANCH]="${SETTINGSBRANCH:-main}"
-    [SVTRACKER]="${SVTRACKER:-}"
+
+    # Stats API settings
+    [STATS_SUBMIT]="${STATS_SUBMIT:-false}"
+    [STATS_API_LOG]="${STATS_API_LOG:-false}"
+    [STATS_API_URL]="${STATS_API_URL:-https://api.etl.lol/api/v2/stats/etl/matches/stats/submit}"
+    [STATS_API_TOKEN]="${STATS_API_TOKEN:-GameStatsWebLuaToken}"
+    [STATS_API_PATH]="${STATS_API_PATH:-/legacy/homepath/legacy/stats/}"
+    
+    # XMAS settings
     [XMAS]="${XMAS:-false}"
     [XMAS_URL]="${XMAS_URL:-}"
 )
+
+
+# Enable/Disable STATS_API. Use a separate branch rather than edit every *.config file 
+STATS_ENABLED=false
+if [ "${CONF[STATS_SUBMIT]}" = "true" ]; then
+    STATS_ENABLED=true
+    # Only set branch if not already specified
+    [ -z "${CONF[SETTINGSBRANCH]}" ] && CONF[SETTINGSBRANCH]="etl-stats-api"
+fi
 
 # Fetch configs from repo
 update_configs() {
@@ -48,92 +95,101 @@ update_configs() {
 # Handle map downloads
 download_maps() {
     IFS=':' read -ra MAP_ARRAY <<< "$MAPS"
+    local maps_to_download=()
+    
+    # First pass - handle existing and local maps
     for map in "${MAP_ARRAY[@]}"; do
-        [ -f "${GAME_BASE}/etmain/${map}.pk3" ] && continue
+        # Skip if map already exists
+        [ -f "${ETMAIN_DIR}/${map}.pk3" ] && continue
 
-        echo "Attempting to download ${map}"
+        log_info "Checking map ${map}"
         if [ -f "/maps/${map}.pk3" ]; then
-            echo "Map ${map} is sourcable locally, copying into place"
-            cp "/maps/${map}.pk3" "${GAME_BASE}/etmain/${map}.pk3"
+            log_info "Map ${map} is sourcable locally, copying into place"
+            cp "/maps/${map}.pk3" "${ETMAIN_DIR}/${map}.pk3"
         else
-            wget -O "${GAME_BASE}/etmain/${map}.pk3" "${CONF[REDIRECTURL]}/etmain/${map}.pk3" || {
-                echo "Failed to download ${map}"
-                rm -f "${GAME_BASE}/etmain/${map}.pk3"
-                continue
-            }
+            maps_to_download+=("${map}")
         fi
     done
+    
+    # If we have maps to download, use parallel
+    if [ ${#maps_to_download[@]} -gt 0 ]; then
+        log_info "Attempting to download ${#maps_to_download[@]} maps in parallel"
+        printf '%s\n' "${maps_to_download[@]}" | \
+            parallel -j 30 \
+            'wget -O "${ETMAIN_DIR}/{}.pk3" "${CONF[REDIRECTURL]}/etmain/{}.pk3" || { 
+                log_warning "Failed to download {}"; 
+                rm -f "${ETMAIN_DIR}/{}.pk3"; 
+            }'
+    fi
 }
 
 # Copy assets
 copy_game_assets() {
     # Create required directories
-    mkdir -p "${GAME_BASE}/etmain/mapscripts/"
-    mkdir -p "${GAME_BASE}/legacy/luascripts/"
+    ensure_directory "${ETMAIN_DIR}/mapscripts/"
+    ensure_directory "${LEGACY_DIR}/luascripts/"
     
-    # Clean up existing mapscripts
-    for mapscript in "${GAME_BASE}/etmain/mapscripts/"*.script; do
-        [ -f "${mapscript}" ] || break
-        rm -rf "${mapscript}"
-    done
-    
-    # Copy mapscripts
+    # Clean and copy mapscripts
+    rm -f "${ETMAIN_DIR}/mapscripts/"*.script
     for mapscript in "${SETTINGS_BASE}/mapscripts/"*.script; do
-        [ -f "${mapscript}" ] || break
-        cp "${mapscript}" "${GAME_BASE}/etmain/mapscripts/"
+        safe_copy "$mapscript" "${ETMAIN_DIR}/mapscripts/"
     done
     
-    # Copy luascripts
+    # Copy luascripts and command maps
     for luascript in "${SETTINGS_BASE}/luascripts/"*.lua; do
-        [ -f "${luascript}" ] || break
-        cp "${luascript}" "${GAME_BASE}/legacy/luascripts/"
+        safe_copy "$luascript" "${LEGACY_DIR}/luascripts/"
     done
     
-    # Copy command maps
     for commandmap in "${SETTINGS_BASE}/commandmaps/"*.pk3; do
-        [ -f "${commandmap}" ] || break
-        cp "${commandmap}" "${GAME_BASE}/legacy/"
+        safe_copy "$commandmap" "${LEGACY_DIR}/"
     done
     
     # Handle configs
-    rm -rf "${GAME_BASE}/etmain/configs/"
-    mkdir -p "${GAME_BASE}/etmain/configs/"
-    cp "${SETTINGS_BASE}/configs/"*.config "${GAME_BASE}/etmain/configs/" 2>/dev/null || true
+    rm -rf "${ETMAIN_DIR}/configs/"
+    ensure_directory "${ETMAIN_DIR}/configs/"
+    cp "${SETTINGS_BASE}/configs/"*.config "${ETMAIN_DIR}/configs/" 2>/dev/null || true
 }
 
 # Update server.cfg with CONF vars
 update_server_config() {
-    cp "${SETTINGS_BASE}/etl_server.cfg" "${GAME_BASE}/etmain/etl_server.cfg"
+    cp "${SETTINGS_BASE}/etl_server.cfg" "${ETMAIN_DIR}/etl_server.cfg"
     
-    # Set g_needpass if password is configured
-    if [ -n "${CONF[PASSWORD]}" ]; then
-        echo 'set g_needpass "1"' >> "${GAME_BASE}/etmain/etl_server.cfg"
-    fi
+    [ -n "${CONF[PASSWORD]}" ] && echo 'set g_needpass "1"' >> "${ETMAIN_DIR}/etl_server.cfg"
 
     # Replace all configuration placeholders
     for key in "${!CONF[@]}"; do
         value=$(echo "${CONF[$key]}" | sed 's/\//\\\//g')
-        sed -i "s/%CONF_${key}%/${value}/g" "${GAME_BASE}/etmain/etl_server.cfg"
+        sed -i "s/%CONF_${key}%/${value}/g" "${ETMAIN_DIR}/etl_server.cfg"
     done
     
-    # Clean up any remaining unreplaced placeholders
-    sed -i 's/%CONF_[A-Z]*%//g' "${GAME_BASE}/etmain/etl_server.cfg"
-
-    # Append extra configuration if it exists
-    [ -f "${GAME_BASE}/extra.cfg" ] && cat "${GAME_BASE}/extra.cfg" >> "${GAME_BASE}/etmain/etl_server.cfg"
+    sed -i 's/%CONF_[A-Z]*%//g' "${ETMAIN_DIR}/etl_server.cfg"
+    [ -f "${GAME_BASE}/extra.cfg" ] && cat "${GAME_BASE}/extra.cfg" >> "${ETMAIN_DIR}/etl_server.cfg"
 }
 
 # Download XMAS content if enabled
 handle_xmas_content() {
     [ "${CONF[XMAS]}" = "true" ] || return 0
     
-    local xmas_file="${GAME_BASE}/legacy/z_xmas.pk3"
+    local xmas_file="${LEGACY_DIR}/z_xmas.pk3"
     [ -f "$xmas_file" ] && return 0
     
-    echo "Downloading XMAS assets..."
+    log_info "Downloading XMAS assets..."
     wget -q --show-progress -O "$xmas_file" "${CONF[XMAS_URL]}" ||
-        { rm -f "$xmas_file"; echo "WARNING: Failed to download XMAS assets"; return 1; }
+        { rm -f "$xmas_file"; log_warning "Failed to download XMAS assets"; return 1; }
 }
+
+# Update the game-stats-web.lua configuration
+configure_stats_api() {
+    local lua_file="${LEGACY_DIR}/luascripts/game-stats-web.lua"
+    [ -f "$lua_file" ] || return 0
+    
+    # Replace configuration placeholders
+    sed -i "s/%CONF_STATS_API_LOG%/${CONF[STATS_API_LOG]}/g" "$lua_file"
+    sed -i "s|%CONF_STATS_API_URL%|${CONF[STATS_API_URL]}|g" "$lua_file"
+    sed -i "s/%CONF_STATS_API_TOKEN%/${CONF[STATS_API_TOKEN]}/g" "$lua_file"
+    sed -i "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" "$lua_file"
+}
+
 
 # Parse additional CLI arguments
 parse_cli_args() {
@@ -154,6 +210,7 @@ download_maps
 copy_game_assets
 update_server_config
 handle_xmas_content
+$STATS_ENABLED && configure_stats_api
 
 ADDITIONAL_ARGS=($(parse_cli_args))
 
