@@ -57,8 +57,8 @@ declare -A CONF=(
     # Stats API settings
     [STATS_SUBMIT]="${STATS_SUBMIT:-false}"
     [STATS_API_LOG]="${STATS_API_LOG:-false}"
-    [STATS_API_URL]="${STATS_API_URL:-https://api.etl.lol/api/v2/stats/etl/matches/stats/submit}"
-    [STATS_API_TOKEN]="${STATS_API_TOKEN:-GameStatsWebLuaToken}"
+    [STATS_API_URL]="${STATS_API_URL:-}"
+    [STATS_API_TOKEN]="${STATS_API_TOKEN:-}"
     [STATS_API_PATH]="${STATS_API_PATH:-/legacy/homepath/legacy/stats/}"
     
     # XMAS settings

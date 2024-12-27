@@ -82,6 +82,11 @@ SVETLTVPASSWORD      | sv_etltv_password              | 3tltv
 TIMEOUTLIMIT         | Maximum number of pauses per map side | 1
 SERVERCONF           | The value for RtcwPro's `g_customConfig` | `legacy6`.
 ADDITIONAL_CLI_ARGS  | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | None.
+STATS_SUBMIT         | Submit match reports using game-stats-web.lua at end of every round | Disabled, set to `true` to enable. 
+STATS_API_URL        | Sets endpoint for the API      | None
+STATS_API_TOKEN      | API Token to be used in request | None
+STATS_API_LOG        | Enable logging in game-stats-web.lua | Disabled, set to `true` to enable. 
+STATS_API_PATH       | Input directory for `matchid.txt` | `/legacy/homepath/legacy/stats/`
 
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
@@ -158,5 +163,5 @@ Version change: 2.83.1-34  || etlegacy-v2.83.1-34-ga127043-x86_64.tar.gz  || has
 Version change: 2.83.1-35  || etlegacy-v2.83.1-35-g0ef228a-x86_64.tar.gz  || hash: 0ef228a7cfb340ee93fb3f0c6dd0c9d46362878f
 Version change: 2.83.1-47  || etlegacy-v2.83.1-47-g87ac222-x86_64.tar.gz  || hash: 87ac222710fc3fa389e47041d578c582a6207cde
 Version change: 2.83.1-56  || etlegacy-v2.83.1-56-ga99596e-x86_64.tar.gz  || hash: a99596e42d7133757f31d5d1b634fd67a7ad72dd
-Version change: 2.83.1-57 || etlegacy-v2.83.1-57-g38f875c-x86_64.tar.gz || hash: 38f875c93be10b3f5fa40f2c56a2a5a6cf01be9d
+Version change: 2.83.1-57  || etlegacy-v2.83.1-57-g38f875c-x86_64.tar.gz  || hash: 38f875c93be10b3f5fa40f2c56a2a5a6cf01be9d
 ```
