@@ -12,7 +12,6 @@ RUN apt-get update && \
 
 # Define build arguments
 ARG STATIC_URL_STABLE
-ARG STATIC_URL_BASEGAME
 WORKDIR /legacy/server
 
 # Download and setup ET Legacy in a single layer
@@ -20,9 +19,18 @@ RUN mkdir -p etmain/mapscripts && \
     curl -SL "$STATIC_URL_STABLE" | tar xz --strip-components=1 && \
     mv etlded.$(arch) etlded && \
     mv etlded_bot.$(arch).sh etlded_bot.sh && \
-    curl -SL "$STATIC_URL_BASEGAME" -o /tmp/etmain.zip && \
-    unzip -q -d etmain /tmp/etmain.zip && \
-    rm -f /tmp/etmain.zip && \
+    # Download and process the official ET files
+    mkdir -p /legacy/server/etmain && \
+    curl -SL "https://cdn.splashdamage.com/downloads/games/wet/et260b.x86_full.zip" -o /tmp/et_full.zip && \
+    cd /tmp && \
+    unzip -q et_full.zip && \
+    chmod +x et260b.x86_keygen_V03.run && \
+    # Extract the .run file without installing
+    sh et260b.x86_keygen_V03.run --tar xf && \
+    # Copy only the required pak files to the correct location
+    cp /tmp/etmain/pak*.pk3 /legacy/server/etmain/ && \
+    # Clean up temporary files
+    rm -rf /tmp/et_full.zip /tmp/et260b.x86_keygen_V03.run /tmp/etmain && \
     git clone --depth 1 --single-branch "https://github.com/Oksii/legacy-configs.git" settings && \
     mkdir -p /legacy/homepath
 
