@@ -71,8 +71,10 @@ declare -A CONF=(
 STATS_ENABLED=false
 if [ "${CONF[STATS_SUBMIT]}" = "true" ]; then
     STATS_ENABLED=true
-    # Only set branch if not already specified
-    [ -z "${CONF[SETTINGSBRANCH]}" ] && CONF[SETTINGSBRANCH]="etl-stats-api"
+    # Set branch if using default branch
+    if [ "${CONF[SETTINGSBRANCH]}" = "main" ]; then
+        CONF[SETTINGSBRANCH]="etl-stats-api"
+    fi
 fi
 
 # Fetch configs from repo
