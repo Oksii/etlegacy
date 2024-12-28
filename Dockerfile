@@ -1,7 +1,6 @@
+# Build stage
 FROM debian:stable-slim AS builder
-ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
@@ -10,39 +9,34 @@ RUN apt-get update && \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Define build arguments
-ARG STATIC_URL_STABLE
+# Second layer: ET base files
 WORKDIR /legacy/server
-
-# Download and setup ET Legacy in a single layer
 RUN mkdir -p etmain/mapscripts && \
-    curl -SL "$STATIC_URL_STABLE" | tar xz --strip-components=1 && \
-    mv etlded.$(arch) etlded && \
-    mv etlded_bot.$(arch).sh etlded_bot.sh && \
-    # Download and process the official ET files
     mkdir -p /legacy/server/etmain && \
     curl -SL "https://cdn.splashdamage.com/downloads/games/wet/et260b.x86_full.zip" -o /tmp/et_full.zip && \
     cd /tmp && \
     unzip -q et_full.zip && \
     chmod +x et260b.x86_keygen_V03.run && \
-    # Extract the .run file without installing
     sh et260b.x86_keygen_V03.run --tar xf && \
-    # Copy only the required pak files to the correct location
     cp /tmp/etmain/pak*.pk3 /legacy/server/etmain/ && \
-    # Clean up temporary files
-    rm -rf /tmp/et_full.zip /tmp/et260b.x86_keygen_V03.run /tmp/etmain && \
-    git clone --depth 1 --single-branch "https://github.com/Oksii/legacy-configs.git" settings && \
+    rm -rf /tmp/et_full.zip /tmp/et260b.x86_keygen_V03.run /tmp/etmain
+
+# Config files
+RUN git clone --depth 1 --single-branch "https://github.com/Oksii/legacy-configs.git" settings && \
     mkdir -p /legacy/homepath
 
-# Copy and prepare scripts
+# ET Legacy files
+ARG STATIC_URL
+RUN curl -SL "${STATIC_URL}" | tar xz --strip-components=1 && \
+    mv etlded.$(arch) etlded && \
+    mv etlded_bot.$(arch).sh etlded_bot.sh
+
 COPY --chmod=755 entrypoint.sh ./start
 COPY --chmod=755 autorestart.sh ./autorestart
 
 # Final stage
 FROM debian:stable-slim
-ENV DEBIAN_FRONTEND=noninteractive
 
-# Install runtime dependencies and tools in a single layer
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         wget \
@@ -58,7 +52,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     useradd -Ms /bin/bash legacy
 
-# Copy files from builder stage
+# Copy files from builder
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
 
 # Configure volumes and working directory

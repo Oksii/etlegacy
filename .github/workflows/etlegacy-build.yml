@@ -1,0 +1,299 @@
+name: ET Legacy Server Build
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' 
+  workflow_dispatch:
+    inputs:
+      version_url:
+        description: 'Custom ET Legacy version URL'
+        required: false
+        type: string
+      set_stable:
+        description: 'Set version as stable (tag)'
+        required: false
+        type: string
+
+env:
+  REGISTRY: docker.io
+  DOCKER_IMAGE: oksii/etlegacy
+  API_ENDPOINT: ${{ secrets.API_ENDPOINT }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Notify Build Start
+        run: |
+          # Determine build type
+          if [ -n "${{ github.event.inputs.version_url }}" ]; then
+            BUILD_TYPE="custom_url"
+          elif [ -n "${{ github.event.inputs.set_stable }}" ]; then
+            BUILD_TYPE="set_stable"
+          else
+            BUILD_TYPE="scheduled"
+          fi
+          
+          # Send start notification for custom URL or set stable
+          if [ "$BUILD_TYPE" != "scheduled" ]; then
+            curl -X POST "${{ secrets.API_ENDPOINT }}" \
+              -H "Authorization: Token ${{ secrets.API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"status\": \"started\",
+                \"type\": \"$BUILD_TYPE\",
+                \"action_url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
+                \"version\": \"${{ github.event.inputs.set_stable }}\"
+              }"
+          fi
+
+      - name: Prepare image metadata
+        id: meta
+        run: |
+          echo "image_name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      # Only run these steps if we're NOT setting a stable tag
+      - name: Checkout repository
+        if: github.event.inputs.set_stable == ''
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract ET Legacy version info
+        if: github.event.inputs.set_stable == ''
+        id: version
+        env:
+          REGISTRY: docker.io
+          DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/etlegacy
+        run: |
+          set -e  # Exit on any error
+          
+          # Function to extract version from URL
+          get_version_from_url() {
+            local url=$1
+            if [[ $url =~ etlegacy-v([0-9]+\.[0-9]+\.[0-9]+-[0-9]+) ]]; then
+              echo "${BASH_REMATCH[1]}"
+            fi
+          }
+          
+          # Function to compare version strings
+          version_gt() {
+            # Split version strings into components
+            IFS='-' read -ra VER1 <<< "$1"
+            IFS='-' read -ra VER2 <<< "$2"
+            
+            # Compare main version numbers first (2.83.1)
+            if [ "$(printf '%s\n' "${VER1[0]}" "${VER2[0]}" | sort -V | head -n 1)" != "${VER1[0]}" ]; then
+                return 0
+            elif [ "${VER1[0]}" != "${VER2[0]}" ]; then
+                return 1
+            fi
+            
+            # If main versions are equal, compare build numbers
+            if [ ${#VER1[@]} -gt 1 ] && [ ${#VER2[@]} -gt 1 ]; then
+                # Compare build numbers
+                if [ "${VER1[1]}" -gt "${VER2[1]}" ]; then
+                    return 0
+                fi
+            fi
+            
+            return 1
+          }
+          
+          # Function to get latest version from Docker Hub
+          get_latest_version() {
+            local repo="${DOCKER_IMAGE#docker.io/}"
+            local api_response
+            local tags
+            
+            echo "Checking Docker Hub repository: $repo" >&2
+            
+            api_response=$(curl -s "https://hub.docker.com/v2/repositories/$repo/tags/")
+            
+            if [ -z "$api_response" ] || ! echo "$api_response" | jq -e '.results' >/dev/null 2>&1; then
+                echo "No tags found in repository" >&2
+                return 1
+            fi
+            
+            tags=$(echo "$api_response" | \
+                jq -r '.results[].name' | \
+                grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+' || true)
+                
+            if [ -z "$tags" ]; then
+                echo "No matching version tags found" >&2
+                return 1
+            fi
+            
+            echo "$tags" | sort -V | tail -n1
+          }
+
+          
+          # Get version information
+          if [ -n "${{ github.event.inputs.version_url }}" ]; then
+            echo "Using manually provided URL..."
+            VERSION_URL="${{ github.event.inputs.version_url }}"
+            VERSION=$(get_version_from_url "$VERSION_URL")
+            
+            if [ -z "$VERSION" ]; then
+              echo "Error: Could not extract version from provided URL: $VERSION_URL"
+              exit 1
+            fi
+          else
+            echo "Fetching latest version from etlegacy.com..."
+            DOWNLOAD_PAGE=$(curl -sSf --retry 3 https://www.etlegacy.com/workflow-files)
+            VERSION_URL=$(echo "$DOWNLOAD_PAGE" | grep -o 'https://www\.etlegacy\.com/workflow-files/dl/[^"]*x86_64\.tar\.gz' | head -1)
+            
+            if [ -z "$VERSION_URL" ]; then
+              echo "Error: Could not find x86_64 download URL"
+              exit 1
+            fi
+            
+            VERSION=$(get_version_from_url "$VERSION_URL")
+            if [ -z "$VERSION" ]; then
+              echo "Error: Could not extract version from URL: $VERSION_URL"
+              exit 1
+            fi
+          fi
+          
+          echo "Detected version: v$VERSION"
+          echo "Using URL: $VERSION_URL"
+          
+          # Check if this version already exists in Docker Hub
+          if docker pull ${DOCKER_IMAGE}:v$VERSION >/dev/null 2>&1; then
+            echo "Version v$VERSION already exists in registry. Skipping build."
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version v$VERSION does not exist in registry. Will build."
+            echo "needs_build=true" >> $GITHUB_OUTPUT
+          fi
+          
+          # Determine if this should be tagged as latest
+          SET_LATEST="true"
+          LATEST_VERSION=$(get_latest_version) || true
+          
+          if [ -n "${{ github.event.inputs.version_url }}" ]; then
+            if [ -n "$LATEST_VERSION" ]; then
+              if ! version_gt "$VERSION" "${LATEST_VERSION#v}"; then
+                SET_LATEST="false"
+                echo "Manual version ($VERSION) is not newer than current latest ($LATEST_VERSION), won't tag as latest"
+              else
+                echo "Manual version ($VERSION) is newer than current latest ($LATEST_VERSION), will tag as latest"
+              fi
+            else
+              echo "No existing versions found in registry, this will be tagged as latest"
+              SET_LATEST="true"
+            fi
+          fi
+          
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+          echo "version_url=$VERSION_URL" >> $GITHUB_OUTPUT
+          echo "set_latest=$SET_LATEST" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        if: github.event.inputs.set_stable == '' && steps.version.outputs.needs_build == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.version.outputs.set_latest == 'true' && format('{0}:latest,{0}:{1}', env.DOCKER_IMAGE, steps.version.outputs.version) || format('{0}:{1}', env.DOCKER_IMAGE, steps.version.outputs.version) }}
+          build-args: |
+            STATIC_URL=${{ steps.version.outputs.version_url }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract and Upload PK3
+        if: github.event.inputs.set_stable == '' && steps.version.outputs.needs_build == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          AWS_DEFAULT_REGION: auto
+          PYTHONWARNINGS: "ignore:Unverified HTTPS request" 
+        run: |
+          set -e  # Exit on any error
+          
+          TEMP_DIR=$(mktemp -d)
+          cd $TEMP_DIR
+          
+          echo "Downloading ET Legacy archive..."
+          curl -sSL -o etlegacy.tar.gz "${{ steps.version.outputs.version_url }}"
+          tar xzf etlegacy.tar.gz
+          
+          PK3_PATH=$(find . -name "legacy_*.pk3")
+          
+          if [ -z "$PK3_PATH" ]; then
+            echo "Error: Could not find pk3 file"
+            exit 1
+          fi
+          
+          echo "Found PK3 file: $PK3_PATH"
+          
+          echo "Uploading to R2..."
+          # Redirect all output to a log file
+          aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --no-verify-ssl \
+            --only-show-errors \
+            > upload.log 2>&1
+          
+          if [ $? -eq 0 ]; then
+            echo "Successfully uploaded PK3 file to R2"
+          else
+            echo "Error uploading to R2. Check the logs for details."
+            cat upload.log | grep -v "$R2_ENDPOINT"  # Show errors but filter out endpoint
+            exit 1
+          fi
+          
+          cd - > /dev/null
+          rm -rf $TEMP_DIR
+
+      # This step only runs when setting a stable tag
+      - name: Set stable tag
+        if: github.event.inputs.set_stable != ''
+        run: |
+          echo "Setting version ${{ github.event.inputs.set_stable }} as stable..."
+          
+          # Pull the specified version
+          docker pull ${DOCKER_IMAGE}:${{ github.event.inputs.set_stable }}
+          
+          # Tag it as stable
+          docker tag ${DOCKER_IMAGE}:${{ github.event.inputs.set_stable }} ${DOCKER_IMAGE}:stable
+          
+          # Push the stable tag
+          docker push ${DOCKER_IMAGE}:stable
+          
+          echo "Successfully set ${{ github.event.inputs.set_stable }} as stable"
+
+      - name: Notify Build Complete
+        if: always()
+        run: |
+          # Determine build type
+          if [ -n "${{ github.event.inputs.version_url }}" ]; then
+            BUILD_TYPE="custom_url"
+          elif [ -n "${{ github.event.inputs.set_stable }}" ]; then
+            BUILD_TYPE="set_stable"
+          else
+            BUILD_TYPE="scheduled"
+          fi
+          
+          curl -X POST "${{ secrets.API_ENDPOINT }}" \
+            -H "Authorization: Token ${{ secrets.API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"status\": \"${{ job.status }}\",
+              \"type\": \"$BUILD_TYPE\",
+              \"action_url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
+              \"version\": \"${{ steps.version.outputs.version || github.event.inputs.set_stable }}\"
+            }"
