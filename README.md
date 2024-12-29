@@ -49,44 +49,44 @@ docker run -d \
 
 ## Configuration Options
 
-Environment Variable | Description                    | Defaults
--------------------- | ------------------------------ | ------------------------
-MAPS                 | List of maps seperated by ':'. | Default 6 maps
-STARTMAP             | Map server starts on.          | "radar".
-REDIRECTURL          | URL of HTTP downloads          | https://index.example.com/et/
-MAP_PORT             | Container port (internal)      | 27960
-MAXCLIENTS           | Maximum number of players      | 32
-AUTO_UPDATE          | Update configurations on restart? | Enabled, set to `false` to enable.
-SVTRACKER            | Set sv_tracker endpoint        | tracker.etl.lol:4444
-XMAS                 | Use optional XMAS pk3          | Disabled, set to `true` to enable. 
-XMAS_URL             | Provide URL to download xmas.pk3 | None 
-SETTINGSURL          | The git URL (must be HTTP public) for the ETL settings repository. | https://github.com/Oksii/legacy-configs.git
-SETTINGSPAT          | Github PAT token for private repos | None
-SETTINGSBRANCH       | The git branch for the ETL settings repository. | `main`
+Environment Variable  | Description                    | Defaults
+--------------------- | ------------------------------ | ------------------------
+MAPS                  | List of maps seperated by ':'. | Default 6 maps
+STARTMAP              | Map server starts on.          | "radar".
+REDIRECTURL           | URL of HTTP downloads          | https://index.example.com/et/
+MAP_PORT              | Container port (internal)      | 27960
+MAXCLIENTS            | Maximum number of players      | 32
+AUTO_UPDATE           | Update configurations on restart? | Enabled, set to `false` to enable.
+SVTRACKER             | Set sv_tracker endpoint        | tracker.etl.lol:4444
+XMAS                  | Use optional XMAS pk3          | Disabled, set to `true` to enable. 
+XMAS_URL              | Provide URL to download xmas.pk3 | None 
+SETTINGSURL           | The git URL (must be HTTP public) for the ETL settings repository. | https://github.com/Oksii/legacy-configs.git
+SETTINGSPAT           | Github PAT token for private repos | None
+SETTINGSBRANCH        | The git branch for the ETL settings repository. | `main`
 
 
 ### Configuration parameters for the default `SETTINGSURL`
 
-Environment Variable | Description                    | Defaults
--------------------- | ------------------------------ | ------------------------
-PASSWORD             | Server password.               | No password.
-RCONPASSWORD         | RCON password.                 | No password (disabled).
-REFEREEPASSWORD      | Referee password.              | No password (disabled).
-SCPASSWORD           | Shoutcaster password.          | No password (disabled).
-HOSTNAME             | Server hostname.               | ET
-CONF_MOTD            | MOTD line on connect           | Empty.
-SVAUTODEMO           | Enable/Disable autodemo record | 0 (disabled)
-SVETLTVMAXSLAVES     | sv_etltv_maxslaves             | 2
-SVETLTVPASSWORD      | sv_etltv_password              | 3tltv
-TIMEOUTLIMIT         | Maximum number of pauses per map side | 1
-SERVERCONF           | The value for RtcwPro's `g_customConfig` | `legacy6`.
-ADDITIONAL_CLI_ARGS  | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | None.
-STATS_SUBMIT         | Submit match reports using game-stats-web.lua at end of every round | Disabled, set to `true` to enable. 
-STATS_API_URL        | Sets endpoint for the API      | None
-STATS_API_TOKEN      | API Token to be used in request | None
-STATS_API_LOG        | Enable logging in game-stats-web.lua | Disabled, set to `true` to enable. 
-STATS_API_PATH       | Input directory for `matchid.txt` | `/legacy/homepath/legacy/stats/`
-
+Environment Variable  | Description                    | Defaults
+--------------------- | ------------------------------ | ------------------------
+PASSWORD              | Server password.               | No password.
+RCONPASSWORD          | RCON password.                 | No password (disabled).
+REFEREEPASSWORD       | Referee password.              | No password (disabled).
+SCPASSWORD            | Shoutcaster password.          | No password (disabled).
+HOSTNAME              | Server hostname.               | ET
+CONF_MOTD             | MOTD line on connect           | Empty.
+SVAUTODEMO            | Enable/Disable autodemo record | 0 (disabled)
+SVETLTVMAXSLAVES      | sv_etltv_maxslaves             | 2
+SVETLTVPASSWORD       | sv_etltv_password              | 3tltv
+TIMEOUTLIMIT          | Maximum number of pauses per map side | 1
+SERVERCONF            | The value for RtcwPro's `g_customConfig` | `legacy6`.
+ADDITIONAL_CLI_ARGS   | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | None.
+STATS_SUBMIT          | Submit match reports using game-stats-web.lua at end of every round | Disabled, set to `true` to enable. 
+STATS_API_TOKEN       | API Token to be used in request | None
+STATS_API_LOG         | Enable logging in game-stats-web.lua | Disabled, set to `true` to enable. 
+STATS_API_PATH        | Path to to save logfile to     | `/legacy/homepath/legacy/stats/`
+STATS_API_URL_SUBMIT  | Sets endpoint for the API to SUBMIT match_report to | None
+STATS_API_URL_MATCHID | Gather Automation. Will fetch matchID from specified base_url/server_ip/server_port endpoint | None
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
 configuration at `/legacy/server/extra.cfg`.
