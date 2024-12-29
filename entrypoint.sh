@@ -57,9 +57,10 @@ declare -A CONF=(
     # Stats API settings
     [STATS_SUBMIT]="${STATS_SUBMIT:-false}"
     [STATS_API_LOG]="${STATS_API_LOG:-false}"
-    [STATS_API_URL]="${STATS_API_URL:-}"
     [STATS_API_TOKEN]="${STATS_API_TOKEN:-}"
     [STATS_API_PATH]="${STATS_API_PATH:-/legacy/homepath/legacy/stats/}"
+    [STATS_API_URL_SUBMIT]="${STATS_API_URL_SUBMIT:-}"
+    [STATS_API_URL_MATCHID]="${STATS_API_URL_MATCHID:-}"
     
     # XMAS settings
     [XMAS]="${XMAS:-false}"
@@ -187,25 +188,10 @@ configure_stats_api() {
     
     # Replace configuration placeholders
     sed -i "s/%CONF_STATS_API_LOG%/${CONF[STATS_API_LOG]}/g" "$lua_file"
-    sed -i "s|%CONF_STATS_API_URL%|${CONF[STATS_API_URL]}|g" "$lua_file"
+    sed -i "s|%CONF_STATS_API_URL_SUBMIT%|${CONF[STATS_API_URL_SUBMIT]}|g" "$lua_file"
+    sed -i "s|%CONF_STATS_API_URL_MATCHID%|${CONF[STATS_API_URL_MATCHID]}|g" "$lua_file"
     sed -i "s/%CONF_STATS_API_TOKEN%/${CONF[STATS_API_TOKEN]}/g" "$lua_file"
-    sed -i "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" "$lua_file"
-
-    # Ensure STATS_API_PATH has a trailing slash
-    if [[ "${CONF[STATS_API_PATH]}" != */ ]]; then
-        CONF[STATS_API_PATH]="${CONF[STATS_API_PATH]}/"
-    fi
-    sed -i "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" "$lua_file"
-    
-    # Create matchid.txt with a Unix timestamp plus a random number
-    local base_timestamp=$(date +%s)
-    local random_suffix=$((RANDOM % 10000))
-    local matchid_value="${base_timestamp}${random_suffix}"
-    
-    local matchid_file="${CONF[STATS_API_PATH]}matchid.txt"
-    ensure_directory "$(dirname "$matchid_file")"
-    printf "%s" "$matchid_value" > "$matchid_file"
-    log_info "Created matchid.txt in ${matchid_file} with value ${matchid_value}"
+    sed -i "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" "$lua_file"    
 }
 
 # Parse additional CLI arguments
