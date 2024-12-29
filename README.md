@@ -45,7 +45,6 @@ docker run -d \
   -e "PASSWORD=war" \
   -e "REFEREEPASSWORD=pass123" \
   oksii/etlegacy
-Version change: 2.83.1-58 || etlegacy-v2.83.1-58-g79bb2fa-x86_64.tar.gz || hash: 79bb2fa6f071ee34ddf5189afc847e3ed06e956e
 ```
 
 ## Configuration Options
