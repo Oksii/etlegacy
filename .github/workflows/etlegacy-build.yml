@@ -17,7 +17,6 @@ on:
 env:
   REGISTRY: docker.io
   DOCKER_IMAGE: oksii/etlegacy
-  API_ENDPOINT: ${{ secrets.API_ENDPOINT }}
 
 jobs:
   build:
@@ -27,30 +26,6 @@ jobs:
       packages: write
 
     steps:
-      - name: Notify Build Start
-        run: |
-          # Determine build type
-          if [ -n "${{ github.event.inputs.version_url }}" ]; then
-            BUILD_TYPE="custom_url"
-          elif [ -n "${{ github.event.inputs.set_stable }}" ]; then
-            BUILD_TYPE="set_stable"
-          else
-            BUILD_TYPE="scheduled"
-          fi
-          
-          # Send start notification for custom URL or set stable
-          if [ "$BUILD_TYPE" != "scheduled" ]; then
-            curl -X POST "${{ secrets.API_ENDPOINT }}" \
-              -H "Authorization: Token ${{ secrets.API_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"status\": \"started\",
-                \"type\": \"$BUILD_TYPE\",
-                \"action_url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
-                \"version\": \"${{ github.event.inputs.set_stable }}\"
-              }"
-          fi
-
       - name: Prepare image metadata
         id: meta
         run: |
@@ -200,6 +175,34 @@ jobs:
           echo "version_url=$VERSION_URL" >> $GITHUB_OUTPUT
           echo "set_latest=$SET_LATEST" >> $GITHUB_OUTPUT
 
+      - name: Notify Build Start
+        if: github.event.inputs.set_stable == '' && steps.version.outputs.needs_build == 'true' && steps.version.outputs.set_latest == 'true'
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"Automatic ET:Legacy Update\",
+                \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
+                \"description\": \"Automatically Scheduled Update Run\n\n\",
+                \"color\": 45220,
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+                \"fields\": [{
+                  \"name\": \"**Docker Image**\",
+                  \"value\": \"Track progress at: **[GitHub Actions](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})**\",
+                  \"inline\": false
+                }],
+                \"author\": {
+                  \"name\": \"ET:Legacy Update\",
+                  \"icon_url\": \"https://images-ext-1.discordapp.net/external/vV4O-GUzjGLpAdb5vNhBpkPDpZMFgunnSEz9WfQvxNA/https/cdn.discordapp.com/emojis/692813160398323863.webp\"
+                },
+                \"thumbnail\": {
+                  \"url\": \"https://pudibot.s3.us-east-005.backblazeb2.com/flag_etl.png\"
+                }
+              }]
+            }"
+
+
       - name: Build and push Docker image
         if: github.event.inputs.set_stable == '' && steps.version.outputs.needs_build == 'true'
         uses: docker/build-push-action@v5
@@ -227,9 +230,11 @@ jobs:
           TEMP_DIR=$(mktemp -d)
           cd $TEMP_DIR
           
-          echo "Downloading ET Legacy archive..."
-          curl -sSL -o etlegacy.tar.gz "${{ steps.version.outputs.version_url }}"
-          tar xzf etlegacy.tar.gz
+          echo "Downloading ET Legacy snapshot..."
+          curl -sSL -O "${{ steps.version.outputs.version_url }}"  # keep original filename
+          
+          TAR_GZ_FILE=$(basename "${{ steps.version.outputs.version_url }}")
+          tar xzf "$TAR_GZ_FILE"
           
           PK3_PATH=$(find . -name "legacy_*.pk3")
           
@@ -240,8 +245,7 @@ jobs:
           
           echo "Found PK3 file: $PK3_PATH"
           
-          echo "Uploading to R2..."
-          # Redirect all output to a log file
+          echo "Uploading PK3 to R2..."
           aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
             --endpoint-url "$R2_ENDPOINT" \
             --no-verify-ssl \
@@ -251,49 +255,47 @@ jobs:
           if [ $? -eq 0 ]; then
             echo "Successfully uploaded PK3 file to R2"
           else
-            echo "Error uploading to R2. Check the logs for details."
-            cat upload.log | grep -v "$R2_ENDPOINT"  # Show errors but filter out endpoint
+            echo "Error uploading PK3 to R2. Check the logs for details."
+            cat upload.log | grep -v "$R2_ENDPOINT"
+            exit 1
+          fi
+          
+          echo "Uploading snapshot to R2..."
+          aws s3 cp "$TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$TAR_GZ_FILE" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --no-verify-ssl \
+            --only-show-errors \
+            > upload.log 2>&1
+          
+          if [ $? -eq 0 ]; then
+            echo "Successfully uploaded tar.gz file to R2"
+          else
+            echo "Error uploading tar.gz to R2. Check the logs for details."
+            cat upload.log | grep -v "$R2_ENDPOINT"
             exit 1
           fi
           
           cd - > /dev/null
           rm -rf $TEMP_DIR
 
-      # This step only runs when setting a stable tag
       - name: Set stable tag
         if: github.event.inputs.set_stable != ''
         run: |
           echo "Setting version ${{ github.event.inputs.set_stable }} as stable..."
           
-          # Pull the specified version
           docker pull ${DOCKER_IMAGE}:${{ github.event.inputs.set_stable }}
-          
-          # Tag it as stable
           docker tag ${DOCKER_IMAGE}:${{ github.event.inputs.set_stable }} ${DOCKER_IMAGE}:stable
-          
-          # Push the stable tag
           docker push ${DOCKER_IMAGE}:stable
           
           echo "Successfully set ${{ github.event.inputs.set_stable }} as stable"
 
-      - name: Notify Build Complete
-        if: always()
+      - name: Trigger Watchtower Update
+        if: github.event.inputs.set_stable != ''
         run: |
-          # Determine build type
-          if [ -n "${{ github.event.inputs.version_url }}" ]; then
-            BUILD_TYPE="custom_url"
-          elif [ -n "${{ github.event.inputs.set_stable }}" ]; then
-            BUILD_TYPE="set_stable"
-          else
-            BUILD_TYPE="scheduled"
-          fi
+          SERVER_URL_LIST="${{ secrets.SERVER_URL_LIST }}"
+          IFS=',' read -ra SERVER_URLS <<< "$SERVER_URL_LIST"
           
-          curl -X POST "${{ secrets.API_ENDPOINT }}" \
-            -H "Authorization: Token ${{ secrets.API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"status\": \"${{ job.status }}\",
-              \"type\": \"$BUILD_TYPE\",
-              \"action_url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
-              \"version\": \"${{ steps.version.outputs.version || github.event.inputs.set_stable }}\"
-            }"
+          for server in "${SERVER_URLS[@]}"; do
+            (curl -X POST -H "Authorization: Bearer ${{ secrets.WATCHTOWER_API_TOKEN }}" http://$server:8080/v1/update --max-time 5 || true) &
+          done
+          wait
