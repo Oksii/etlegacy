@@ -268,9 +268,9 @@ jobs:
             > upload.log 2>&1
           
           if [ $? -eq 0 ]; then
-            echo "Successfully uploaded tar.gz file to R2"
+            echo "Successfully uploaded snapshot to R2"
           else
-            echo "Error uploading tar.gz to R2. Check the logs for details."
+            echo "Error uploading snapshot to R2. Check the logs for details."
             cat upload.log | grep -v "$R2_ENDPOINT"
             exit 1
           fi
