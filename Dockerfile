@@ -26,8 +26,18 @@ RUN git clone --depth 1 --single-branch "https://github.com/Oksii/legacy-configs
     mkdir -p /legacy/homepath
 
 # ET Legacy files
-ARG STATIC_URL
-RUN curl -SL "${STATIC_URL}" | tar xz --strip-components=1 && \
+ARG STATIC_URL_AMD64
+ARG STATIC_URL_ARM64
+ARG TARGETARCH
+
+# Download and extract the correct version based on architecture
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        echo "Downloading ARM64 version..." && \
+        curl -SL "${STATIC_URL_ARM64}" | tar xz --strip-components=1; \
+    else \
+        echo "Downloading AMD64 version..." && \
+        curl -SL "${STATIC_URL_AMD64}" | tar xz --strip-components=1; \
+    fi && \
     mv etlded.$(arch) etlded && \
     mv etlded_bot.$(arch).sh etlded_bot.sh
 
@@ -45,12 +55,16 @@ RUN apt-get update && \
         curl \
         ca-certificates \
         parallel \
-    && wget -q https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_amd64 -O /bin/icecon && \
-    chmod +x /bin/icecon && \
-    mkdir -p /legacy/server/legacy && \
-    wget -q https://raw.githubusercontent.com/LuaDist/dkjson/master/dkjson.lua -O /legacy/server/legacy/dkjson.lua && \
-    rm -rf /var/lib/apt/lists/* && \
-    useradd -Ms /bin/bash legacy
+    && if [ "$(arch)" = "aarch64" ]; then \
+        wget -q https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_arm -O /bin/icecon; \
+    else \
+        wget -q https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_amd64 -O /bin/icecon; \
+    fi \
+    && chmod +x /bin/icecon \
+    && mkdir -p /legacy/server/legacy \
+    && wget -q https://raw.githubusercontent.com/LuaDist/dkjson/master/dkjson.lua -O /legacy/server/legacy/dkjson.lua \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -Ms /bin/bash legacy
 
 # Copy files from builder
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/

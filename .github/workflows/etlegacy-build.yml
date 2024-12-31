@@ -173,7 +173,7 @@ jobs:
 
           # Check if an ARM snapshot exists and include in our build
           echo "Checking for ARM version..."
-          
+
           # Try both possible ARM URL patterns
           # Pattern 1: Simple x86_64 to aarch64 replacement
           ARM_URL="${VERSION_URL/x86_64.tar.gz/aarch64.tar.gz}"
@@ -231,7 +231,6 @@ jobs:
               }]
             }"
 
-
       - name: Build and push Docker image
         if: github.event.inputs.set_stable == '' && steps.version.outputs.needs_build == 'true'
         uses: docker/build-push-action@v5
@@ -241,7 +240,8 @@ jobs:
           platforms: ${{ steps.version.outputs.arm_available == 'true' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           tags: ${{ steps.version.outputs.set_latest == 'true' && format('{0}:latest,{0}:{1}', env.DOCKER_IMAGE, steps.version.outputs.version) || format('{0}:{1}', env.DOCKER_IMAGE, steps.version.outputs.version) }}
           build-args: |
-            STATIC_URL=${{ steps.version.outputs.version_url }}
+            STATIC_URL_AMD64=${{ steps.version.outputs.version_url }}
+            STATIC_URL_ARM64=${{ steps.version.outputs.arm_url }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
