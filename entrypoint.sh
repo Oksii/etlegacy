@@ -61,7 +61,10 @@ declare -A CONF=(
     [STATS_API_PATH]="${STATS_API_PATH:-/legacy/homepath/legacy/stats/}"
     [STATS_API_URL_SUBMIT]="${STATS_API_URL_SUBMIT:-}"
     [STATS_API_URL_MATCHID]="${STATS_API_URL_MATCHID:-}"
-    
+    [STATS_API_OBITUARIES]="${STATS_API_OBITUARIES:-true}"
+    [STATS_API_MESSAGELOG]="${STATS_API_MESSAGELOG:-false}"
+    [STATS_API_DAMAGESTAT]="${STATS_API_DAMAGESTAT:-false}"
+
     # XMAS settings
     [XMAS]="${XMAS:-false}"
     [XMAS_URL]="${XMAS_URL:-}"
@@ -190,8 +193,11 @@ configure_stats_api() {
     sed -i "s/%CONF_STATS_API_LOG%/${CONF[STATS_API_LOG]}/g" "$lua_file"
     sed -i "s|%CONF_STATS_API_URL_SUBMIT%|${CONF[STATS_API_URL_SUBMIT]}|g" "$lua_file"
     sed -i "s|%CONF_STATS_API_URL_MATCHID%|${CONF[STATS_API_URL_MATCHID]}|g" "$lua_file"
-    sed -i "s/%CONF_STATS_API_TOKEN%/${CONF[STATS_API_TOKEN]}/g" "$lua_file"
-    sed -i "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" "$lua_file"    
+    sed -i "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" "$lua_file" 
+    sed -i "s/%CONF_STATS_API_TOKEN%/${CONF[STATS_API_TOKEN]}/g" "$lua_file"   
+    sed -i "s/%CONF_STATS_API_OBITUARIES%/${CONF[STATS_API_OBITUARIES]}/g" "$lua_file"
+    sed -i "s/%CONF_STATS_API_MESSAGELOG%/${CONF[STATS_API_MESSAGELOG]}/g" "$lua_file"
+    sed -i "s/%CONF_STATS_API_DAMAGESTAT%/${CONF[STATS_API_DAMAGESTAT]}/g" "$lua_file"
 }
 
 # Parse additional CLI arguments
