@@ -2,7 +2,7 @@ name: ET Legacy Server Build
 
 on:
   schedule:
-    - cron: '0 */6 * * *' 
+    - cron: '0 */12 * * *' 
   workflow_dispatch:
     inputs:
       version_url:
@@ -173,15 +173,30 @@ jobs:
 
           # Check if an ARM snapshot exists and include in our build
           echo "Checking for ARM version..."
+          
+          # Try both possible ARM URL patterns
+          # Pattern 1: Simple x86_64 to aarch64 replacement
           ARM_URL="${VERSION_URL/x86_64.tar.gz/aarch64.tar.gz}"
           
+          # Pattern 2: Replace lnxx8664 directory with lnxarm64
+          ARM_URL_ALT="${VERSION_URL/lnxx8664/lnxarm64}"
+          ARM_URL_ALT="${ARM_URL_ALT/x86_64.tar.gz/aarch64.tar.gz}"
+          
+          echo "Checking primary ARM path: $ARM_URL"
           if curl --output /dev/null --silent --head --fail "$ARM_URL"; then
             echo "ARM version found at: $ARM_URL"
             echo "arm_available=true" >> $GITHUB_OUTPUT
             echo "arm_url=$ARM_URL" >> $GITHUB_OUTPUT
           else
-            echo "No ARM version available"
-            echo "arm_available=false" >> $GITHUB_OUTPUT
+            echo "Checking alternative ARM path: $ARM_URL_ALT"
+            if curl --output /dev/null --silent --head --fail "$ARM_URL_ALT"; then
+              echo "ARM version found at: $ARM_URL_ALT"
+              echo "arm_available=true" >> $GITHUB_OUTPUT
+              echo "arm_url=$ARM_URL_ALT" >> $GITHUB_OUTPUT
+            else
+              echo "No ARM version available at either location"
+              echo "arm_available=false" >> $GITHUB_OUTPUT
+            fi
           fi
           
           # Keep your existing output statements
