@@ -170,7 +170,21 @@ jobs:
               SET_LATEST="true"
             fi
           fi
+
+          # Check if an ARM snapshot exists and include in our build
+          echo "Checking for ARM version..."
+          ARM_URL="${VERSION_URL/x86_64.tar.gz/aarch64.tar.gz}"
           
+          if curl --output /dev/null --silent --head --fail "$ARM_URL"; then
+            echo "ARM version found at: $ARM_URL"
+            echo "arm_available=true" >> $GITHUB_OUTPUT
+            echo "arm_url=$ARM_URL" >> $GITHUB_OUTPUT
+          else
+            echo "No ARM version available"
+            echo "arm_available=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Keep your existing output statements
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
           echo "version_url=$VERSION_URL" >> $GITHUB_OUTPUT
           echo "set_latest=$SET_LATEST" >> $GITHUB_OUTPUT
@@ -209,6 +223,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: ${{ steps.version.outputs.arm_available == 'true' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           tags: ${{ steps.version.outputs.set_latest == 'true' && format('{0}:latest,{0}:{1}', env.DOCKER_IMAGE, steps.version.outputs.version) || format('{0}:{1}', env.DOCKER_IMAGE, steps.version.outputs.version) }}
           build-args: |
             STATIC_URL=${{ steps.version.outputs.version_url }}
@@ -230,54 +245,49 @@ jobs:
           TEMP_DIR=$(mktemp -d)
           cd $TEMP_DIR
           
-          echo "Downloading ET Legacy snapshot..."
-          curl -sSL -O "${{ steps.version.outputs.version_url }}"  # keep original filename
+          # Download and process x86_64 version
+          echo "Downloading x86_64 ET Legacy snapshot..."
+          curl -sSL -O "${{ steps.version.outputs.version_url }}"
           
-          TAR_GZ_FILE=$(basename "${{ steps.version.outputs.version_url }}")
-          tar xzf "$TAR_GZ_FILE"
+          X86_TAR_GZ_FILE=$(basename "${{ steps.version.outputs.version_url }}")
+          tar xzf "$X86_TAR_GZ_FILE"
           
+          # Extract and upload PK3 from x86_64
           PK3_PATH=$(find . -name "legacy_*.pk3")
-          
           if [ -z "$PK3_PATH" ]; then
             echo "Error: Could not find pk3 file"
             exit 1
           fi
           
-          echo "Found PK3 file: $PK3_PATH"
-          
           echo "Uploading PK3 to R2..."
           aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
             --endpoint-url "$R2_ENDPOINT" \
             --no-verify-ssl \
-            --only-show-errors \
-            > upload.log 2>&1
+            --only-show-errors
           
-          if [ $? -eq 0 ]; then
-            echo "Successfully uploaded PK3 file to R2"
-          else
-            echo "Error uploading PK3 to R2. Check the logs for details."
-            cat upload.log | grep -v "$R2_ENDPOINT"
-            exit 1
-          fi
-          
-          echo "Uploading snapshot to R2..."
-          aws s3 cp "$TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$TAR_GZ_FILE" \
+          echo "Uploading x86_64 snapshot to R2..."
+          aws s3 cp "$X86_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$X86_TAR_GZ_FILE" \
             --endpoint-url "$R2_ENDPOINT" \
             --no-verify-ssl \
-            --only-show-errors \
-            > upload.log 2>&1
-          
-          if [ $? -eq 0 ]; then
-            echo "Successfully uploaded snapshot to R2"
-          else
-            echo "Error uploading snapshot to R2. Check the logs for details."
-            cat upload.log | grep -v "$R2_ENDPOINT"
-            exit 1
+            --only-show-errors
+
+          # If ARM version is available, download and upload it too
+          if [ "${{ steps.version.outputs.arm_available }}" = "true" ]; then
+            echo "Downloading ARM ET Legacy snapshot..."
+            curl -sSL -O "${{ steps.version.outputs.arm_url }}"
+            
+            ARM_TAR_GZ_FILE=$(basename "${{ steps.version.outputs.arm_url }}")
+            
+            echo "Uploading ARM snapshot to R2..."
+            aws s3 cp "$ARM_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$ARM_TAR_GZ_FILE" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --no-verify-ssl \
+              --only-show-errors
           fi
           
           cd - > /dev/null
           rm -rf $TEMP_DIR
-
+  
       - name: Set stable tag
         if: github.event.inputs.set_stable != ''
         run: |
