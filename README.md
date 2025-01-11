@@ -87,6 +87,7 @@ STATS_API_LOG         | Enable logging in game-stats-web.lua | Disabled, set to 
 STATS_API_PATH        | Path to to save logfile to     | `/legacy/homepath/legacy/stats/`
 STATS_API_URL_SUBMIT  | Sets endpoint for the API to SUBMIT match_report to | None
 STATS_API_URL_MATCHID | Gather Automation. Will fetch matchID from specified base_url/server_ip/server_port endpoint | None
+STATS_API_DUMPJSON    | Debug, dump stats json to file before sending | Disabled, set to `true` to enable. 
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
 configuration at `/legacy/server/extra.cfg`.
