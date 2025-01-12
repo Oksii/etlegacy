@@ -263,8 +263,15 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET_NAME }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           AWS_DEFAULT_REGION: auto
-          PYTHONWARNINGS: "ignore:Unverified HTTPS request" 
+          AWS_PYTHON_CONNECTOR_DISABLE_SSL_VERIFICATION: 'True'
+          AWS_CLI_FILE_ENCODING: 'UTF-8'
         run: |
+          # Configure AWS CLI to disable SSL verification warnings
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/config
+          echo "cli_follow_urlparam=false" >> ~/.aws/config
+          echo "no_verify_ssl=true" >> ~/.aws/config
+          
           set -e  # Exit on any error
           
           TEMP_DIR=$(mktemp -d)
