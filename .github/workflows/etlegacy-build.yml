@@ -264,13 +264,18 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           AWS_DEFAULT_REGION: auto
           AWS_PYTHON_CONNECTOR_DISABLE_SSL_VERIFICATION: 'True'
-          AWS_CLI_FILE_ENCODING: 'UTF-8'
+          PYTHONWARNINGS: "ignore::urllib3.exceptions.InsecureRequestWarning"
+          REQUESTS_CA_BUNDLE: ""
+          AWS_CA_BUNDLE: ""
+          BOTO_VERIFY_SSL: "FALSE"
         run: |
-          # Configure AWS CLI to disable SSL verification warnings
-          mkdir -p ~/.aws
-          echo "[default]" > ~/.aws/config
-          echo "cli_follow_urlparam=false" >> ~/.aws/config
-          echo "no_verify_ssl=true" >> ~/.aws/config
+          # Disable SSL warnings in Python
+          python3 -c "
+          import urllib3
+          import warnings
+          urllib3.disable_warnings()
+          warnings.filterwarnings('ignore', category=urllib3.exceptions.InsecureRequestWarning)
+          "
           
           set -e  # Exit on any error
           
@@ -295,13 +300,13 @@ jobs:
           aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
             --endpoint-url "$R2_ENDPOINT" \
             --no-verify-ssl \
-            --only-show-errors
+            --only-show-errors 2>/dev/null
           
           echo "Uploading x86_64 snapshot to R2..."
           aws s3 cp "$X86_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$X86_TAR_GZ_FILE" \
             --endpoint-url "$R2_ENDPOINT" \
             --no-verify-ssl \
-            --only-show-errors
+            --only-show-errors 2>/dev/null
 
           # If ARM version is available, download and upload it too
           if [ "${{ steps.version.outputs.arm_available }}" = "true" ]; then
@@ -314,7 +319,7 @@ jobs:
             aws s3 cp "$ARM_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$ARM_TAR_GZ_FILE" \
               --endpoint-url "$R2_ENDPOINT" \
               --no-verify-ssl \
-              --only-show-errors
+              --only-show-errors 2>/dev/null
           fi
           
           cd - > /dev/null
