@@ -13,6 +13,11 @@ on:
         description: 'Set version as stable (tag)'
         required: false
         type: string
+      force_rebuild:
+        description: 'Force rebuild even if version exists'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: docker.io
@@ -143,14 +148,19 @@ jobs:
           
           echo "Detected version: v$VERSION"
           echo "Using URL: $VERSION_URL"
-          
+                    
           # Check if this version already exists in Docker Hub
-          if docker pull ${DOCKER_IMAGE}:v$VERSION >/dev/null 2>&1; then
-            echo "Version v$VERSION already exists in registry. Skipping build."
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-          else
-            echo "Version v$VERSION does not exist in registry. Will build."
+          if [ "${{ github.event.inputs.force_rebuild }}" = "true" ]; then
+            echo "Force rebuild requested. Will build regardless of existing version."
             echo "needs_build=true" >> $GITHUB_OUTPUT
+          else
+            if docker pull ${DOCKER_IMAGE}:v$VERSION >/dev/null 2>&1; then
+              echo "Version v$VERSION already exists in registry. Skipping build."
+              echo "needs_build=false" >> $GITHUB_OUTPUT
+            else
+              echo "Version v$VERSION does not exist in registry. Will build."
+              echo "needs_build=true" >> $GITHUB_OUTPUT
+            fi
           fi
           
           # Determine if this should be tagged as latest
