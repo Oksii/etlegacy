@@ -199,8 +199,7 @@ configure_stats_api() {
     sed -i "s/%CONF_STATS_API_OBITUARIES%/${CONF[STATS_API_OBITUARIES]}/g" "$lua_file"
     sed -i "s/%CONF_STATS_API_MESSAGELOG%/${CONF[STATS_API_MESSAGELOG]}/g" "$lua_file"
     sed -i "s/%CONF_STATS_API_DAMAGESTAT%/${CONF[STATS_API_DAMAGESTAT]}/g" "$lua_file"
-    sed -i "s/%CONF_STATS_API_DUMP%/${CONF[STATS_API_DUMPJSON]}/g" "$lua_file"
-    CONF_STATS_API_DUMP
+    sed -i "s/%CONF_STATS_API_DUMPJSON%/${CONF[STATS_API_DUMPJSON]}/g" "$lua_file"
 }
 
 # Parse additional CLI arguments
