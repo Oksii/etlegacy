@@ -1,5 +1,63 @@
 #!/bin/bash
 
+###############################################################################
+#
+# ETLegacy Server Setup Script
+# Version: 1.0.0
+# Last Updated: 2025-01-18
+# Author: Oksii
+#
+# Description:
+# Automated installation and configuration script for ETLegacy game servers
+# using Docker containers. Sets up multiple server instances, configures maps,
+# and manages all necessary dependencies.
+#
+# License:
+# MIT License
+# Copyright (c) 2025 Oksii
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# Tested On:
+# - Ubuntu 22.04 LTS (AMD64/ARM64)
+# - Ubuntu 22.04 LTS Minimal (AMD64/ARM64)
+# - Debian 11 Bullseye (AMD64/ARM64)
+# - Debian 12 Bookworm (AMD64/ARM64)
+# - CentOS 9 Stream (AMD64/ARM64)
+# - Amazon Linux 2023 (AMD64/ARM64)
+#
+# Features:
+# - Multi-server instance support
+# - Automated Docker installation and configuration
+# - Map downloads and management
+# - Match statistic tracking and submission
+# - Automatic updates via Watchtower
+# - Built-in map download webserver
+# - User management and security
+#
+# Requirements:
+# - Root access or sudo privileges
+# - Internet connection
+# - Minimum 1GB RAM
+# - 2GB free disk space
+#
+# Notes:
+# - Full multi-architecture support (AMD64/ARM64)
+# - DO NOT use on CentOS 10 (known compatibility issues)
+# - Requires port forwarding for server ports (default: 27960+)
+# - Uses official Docker installation method
+# - Creates required user and group permissions
+# - All Docker images are multi-arch compatible
+#
+###############################################################################
+
 # Color definitions for pretty output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -14,14 +72,19 @@ BOLD='\033[1m'
 SELECTED_USER=""
 INSTANCES=1
 INSTALL_DIR=""
-CURRENT_USER="$SUDO_USER"
 
-[ -z "$CURRENT_USER" ] && CURRENT_USER="$USER"
+# Set current user handling both sudo and non-sudo cases
+if [ -n "${SUDO_USER-}" ]; then
+    CURRENT_USER="$SUDO_USER"
+else
+    CURRENT_USER="$USER"
+fi
 
 SETTINGS_FILE="settings.env"
-DEFAULT_MAPS="adlernest braundorf_b4 "
+DEFAULT_MAPS="adlernest braundorf_b4 bremen_b3 decay_sw erdenberg_t2 et_brewdog_b6 et_ice et_operation_b7 etl_adlernest_v4 etl_frostbite_v17 etl_ice_v12 etl_sp_delivery_v5 frostbite karsiah_te2 missile_b3 supply_sp sw_goldrush_te te_escape2_fixed3 te_valhalla"
 
 DEBUG=${DEBUG:-0}
+
 
 log() {
     local level=$1
@@ -46,6 +109,10 @@ show_header() {
     echo -e "${PURPLE}================================================${NC}\n"
 }
 
+set -euo pipefail
+trap 'handle_error ${LINENO} $?' ERR
+trap 'echo -e "\nScript interrupted by user" >&2; exit 1' INT
+
 handle_error() {
     local line_no=$1
     local error_code=$2
@@ -59,8 +126,17 @@ handle_error() {
     fi
 }
 
-trap 'handle_error ${LINENO} $?' ERR
-set -euo pipefail
+get_os_type() {
+    if command -v lsb_release >/dev/null 2>&1; then
+        os_id=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
+    elif [ -f /etc/os-release ]; then
+        os_id=$(. /etc/os-release && echo "$ID" | tr '[:upper:]' '[:lower:]')
+    else
+        log "error" "Cannot determine OS type"
+        exit 1
+    fi
+    echo "$os_id"
+}
 
 prompt_with_default() {
     local prompt=$1
@@ -169,7 +245,7 @@ show_info_with_timeout() {
     echo -e "$message"
     
     if [ "$force_input" = "true" ]; then
-        echo -e "\n${YELLOW}Enter your response:${NC}"
+        echo -e "\n${YELLOW}Continue? (Y/n):${NC}"
         read -p "$prompt_symbol " input
         echo "${input:-$default_value}"
         return 0
@@ -336,27 +412,53 @@ check_pk3() {
 }
 
 check_system() {
-    if ! command -v lsb_release >/dev/null 2>&1; then
-        log "info" "Installing lsb-release..."
-        apt-get update &>/dev/null && apt-get install -y lsb-release &>/dev/null
-    fi
+    local os_type
+    local os_version
     
-    local os_id=$(lsb_release -si)
-    local os_version=$(lsb_release -sr)
-    
-    if [[ ! "$os_id" =~ ^(Ubuntu|Debian)$ ]]; then
-        log "error" "This script only supports Ubuntu and Debian systems."
-        log "error" "Detected system: $os_id $os_version"
+    # Try to get OS info from /etc/os-release first
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        os_type="$ID"
+        os_version="$VERSION_ID"
+    # Fallback to lsb_release if available
+    elif command -v lsb_release >/dev/null 2>&1; then
+        os_type=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
+        os_version=$(lsb_release -sr)
+    else
+        log "error" "Cannot determine OS type"
         exit 1
     fi
-    
-    log "success" "System compatibility check passed ($os_id $os_version)"
+
+    case "$os_type" in
+        ubuntu|debian)
+            log "success" "System compatibility check passed ($os_type $os_version)"
+            ;;
+        centos|rhel|amzn|rocky|almalinux)
+            # Install EPEL repository first if needed
+            if [ ! -f /etc/yum.repos.d/epel.repo ]; then
+                log "info" "Installing EPEL repository..."
+                yum install -y epel-release &>/dev/null
+            fi
+            log "success" "System compatibility check passed ($os_type $os_version)"
+            ;;
+        *)
+            log "error" "Unsupported operating system: $os_type"
+            log "error" "This script supports: Ubuntu, Debian, CentOS, RHEL, Amazon Linux"
+            exit 1
+            ;;
+    esac
 }
 
 check_root() {
     if [ "$EUID" -ne 0 ]; then 
-        log "error" "This script must be run as root or with sudo."
-        exit 1
+        if ! command -v sudo &>/dev/null; then
+            log "error" "This script must be run as root or with sudo."
+            exit 1
+        fi
+        if ! sudo -v &>/dev/null; then
+            log "error" "This script requires sudo privileges."
+            exit 1
+        fi
     fi
 }
 
@@ -395,30 +497,111 @@ install_requirements() {
     show_header
     log "prompt" "Installing Required Packages..."
     
-    local packages=(
-        curl
-        wget
-        parallel
-        lsb-release
-        gnupg
-        ca-certificates
-        apt-transport-https
-    )
+    local os_type=$(get_os_type)
+    log "info" "Detected OS: $os_type"
     
-    apt-get update &>/dev/null
-    for package in "${packages[@]}"; do
-        echo -n "Installing $package... "
-        if apt-get install -y "$package" &>/dev/null; then
-            echo -e "${GREEN}OK${NC}"
-        else
-            echo -e "${RED}FAILED${NC}"
-            log "error" "Failed to install $package"
+    # Check if we're root, if not use sudo
+    local SUDO=""
+    if [ "$EUID" -ne 0 ]; then 
+        SUDO="sudo"
+    fi
+    
+    case "$os_type" in
+        ubuntu|debian)
+            local packages=(
+                curl
+                wget
+                parallel
+                lsb-release
+                gnupg
+                ca-certificates
+                apt-transport-https
+            )
+            
+            echo -n "Updating package lists... "
+            if $SUDO apt-get update &>/dev/null; then
+                echo -e "${GREEN}OK${NC}"
+            else
+                echo -e "${RED}FAILED${NC}"
+                return 1
+            fi
+            
+            for package in "${packages[@]}"; do
+                echo -n "Installing $package... "
+                if dpkg -l | grep -q "^ii  $package "; then
+                    echo -e "${GREEN}ALREADY INSTALLED${NC}"
+                elif $SUDO apt-get install -y "$package" &>/dev/null; then
+                    echo -e "${GREEN}OK${NC}"
+                else
+                    echo -e "${RED}FAILED${NC}"
+                    log "error" "Failed to install $package"
+                    return 1
+                fi
+            done
+            ;;
+            
+        centos|rhel|amzn|rocky|almalinux)
+            # Update package lists for yum-based systems
+            echo -n "Updating package lists... "
+            if $SUDO yum check-update &>/dev/null || [ $? -eq 100 ]; then
+                echo -e "${GREEN}OK${NC}"
+            else
+                echo -e "${RED}FAILED${NC}"
+                return 1
+            fi
+
+            # Update curl first with allow-erasing to handle any conflicts
+            echo -n "Updating/Installing curl... "
+            if $SUDO yum install -y --allow-erasing curl &>/dev/null; then
+                echo -e "${GREEN}OK${NC}"
+            else
+                echo -e "${RED}FAILED${NC}"
+                return 1
+            fi
+
+            # First ensure epel-release is installed for non-Amazon systems
+            if [ "$os_type" != "amzn" ]; then
+                echo -n "Installing EPEL repository... "
+                if $SUDO yum install -y epel-release &>/dev/null; then
+                    echo -e "${GREEN}OK${NC}"
+                else
+                    echo -e "${RED}FAILED${NC}"
+                    return 1
+                fi
+            fi
+
+            local packages=(
+                curl
+                wget
+                parallel
+                yum-utils
+                ca-certificates
+            )
+            
+            for package in "${packages[@]}"; do
+                echo -n "Installing $package... "
+                if rpm -q "$package" &>/dev/null; then
+                    echo -e "${GREEN}ALREADY INSTALLED${NC}"
+                elif $SUDO yum install -y --allow-erasing "$package" &>/dev/null; then
+                    echo -e "${GREEN}OK${NC}"
+                else
+                    echo -e "${RED}FAILED${NC}"
+                    log "error" "Failed to install $package"
+                    return 1
+                fi
+            done
+            ;;
+            
+        *)
+            log "error" "Unsupported operating system: $os_type"
+            log "error" "This script supports: Ubuntu, Debian, CentOS, RHEL, Amazon Linux"
             return 1
-        fi
-    done
+            ;;
+    esac
     
     log "success" "All required packages installed successfully!"
     sleep 2
+    return 0
 }
 
 setup_user() {
@@ -426,16 +609,34 @@ setup_user() {
     log "prompt" "User Account Setup"
     
     SELECTED_USER=""
-    local current_user="$SUDO_USER"
-    [ -z "$current_user" ] && current_user="$USER"
     local default_server_user="etlserver"
+    local current_user
+    local real_user
+
+    if [ -n "${SUDO_USER-}" ]; then
+        real_user="$SUDO_USER"
+    elif [ "$USER" != "root" ]; then
+        real_user="$USER"
+    else
+        real_user=$(who am i | awk '{print $1}')
+        # If still empty (e.g., running in a container), default to root
+        [ -z "$real_user" ] && real_user="root"
+    fi
     
-    # Check if current user is a regular user (UID 1000)
-    local current_uid=$(id -u "$current_user")
+    current_user="$real_user"
+    
+    # Check if current user is a regular user (UID >= 1000)
+    local current_uid
+    if [ "$current_user" = "root" ]; then
+        current_uid=0
+    else
+        current_uid=$(id -u "$current_user")
+    fi
+    
     local suggested_option="2"  # Default to creating new user
     
-    if [ "$current_uid" = "1000" ]; then
-        suggested_option="1"  # Suggest using current user if it's UID 1000
+    if [ "$current_uid" -ge 1000 ]; then
+        suggested_option="1"  # Suggest using current user if it's a regular user
     fi
     
     echo -e "${YELLOW}Choose a user account for running the ETLegacy servers:${NC}\n"
@@ -461,7 +662,14 @@ setup_user() {
                 echo -e "${YELLOW}Creating a new dedicated user account for ETLegacy servers.${NC}\n"
                 
                 while true; do
-                    local new_user=$(prompt_with_default "Enter username for new account" "$default_server_user" "Username for the new system account")
+                    echo -e "${YELLOW}Username Requirements:${NC}"
+                    echo -e "• Start with lowercase letter"
+                    echo -e "• Use only lowercase letters, numbers, dash (-) or underscore (_)\n"
+                    
+                    read -p "Enter username: [default: etlserver] " new_user
+                    
+                    # Use default if empty
+                    new_user=${new_user:-$default_server_user}
                     
                     # Check if user already exists
                     if id "$new_user" >/dev/null 2>&1; then
@@ -470,21 +678,47 @@ setup_user() {
                     fi
                     
                     # Validate username format
-                    if ! [[ $new_user =~ ^[a-z_][a-z0-9_-]*[$]?$ ]]; then
-                        log "warning" "Invalid username format. Use only lowercase letters, numbers, dash (-) and underscore (_)."
+                    if ! [[ $new_user =~ ^[a-z][a-z0-9_-]*$ ]]; then
+                        log "warning" "Invalid username format. Username must:"
+                        echo -e "• Start with a lowercase letter"
+                        echo -e "• Contain only lowercase letters, numbers, dash (-) or underscore (_)"
+                        echo -e "• Example valid usernames: etlserver, etl-server, etl_server1\n"
                         continue
                     fi
                     
                     echo -e "\n${YELLOW}Creating user account...${NC}"
                     if useradd -m -s /bin/bash "$new_user"; then
-                        echo -e "\n${YELLOW}Please set a password for $new_user${NC}"
-                        if passwd "$new_user"; then
-                            SELECTED_USER=$new_user
-                            break 2 
-                        else
-                            log "error" "Failed to set password. Removing user..."
-                            userdel -r "$new_user" >/dev/null 2>&1
-                        fi
+                        while true; do
+                            echo -e "\n${YELLOW}Set password for $new_user${NC}"
+                            echo -e "${BLUE}Minimum 8 characters required${NC}\n"
+                            read -s -p "Enter password: " password
+                            echo
+                            read -s -p "Confirm password: " password2
+                            echo
+
+                            if [ "$password" != "$password2" ]; then
+                                echo -e "\n${RED}Passwords do not match. Please try again.${NC}"
+                                continue
+                            fi
+                            
+                            if [ ${#password} -lt 8 ]; then
+                                echo -e "\n${RED}Password must be at least 8 characters long.${NC}"
+                                continue
+                            fi
+
+                            # Use openssl to create password hash and set it directly
+                            HASH=$(echo "$password" | openssl passwd -6 -stdin)
+                            if echo "$new_user:$HASH" | chpasswd -e; then
+                                SELECTED_USER=$new_user
+                                log "success" "User setup complete: $SELECTED_USER"
+                                export SELECTED_USER
+                                return 0  # Return immediately after successful user creation
+                            else
+                                log "error" "Failed to set password. Removing user..."
+                                userdel -r "$new_user" >/dev/null 2>&1
+                                break  # Break inner loop on failure
+                            fi
+                        done
                     else
                         log "error" "Failed to create user '$new_user'. Please try again."
                     fi
@@ -541,131 +775,157 @@ setup_user() {
     return 0
 }
 
-check_docker() {
-    if command -v docker &> /dev/null; then
-        if docker compose version &> /dev/null || command -v docker-compose &> /dev/null; then
-            return 0
-        else
-            return 2
-        fi
-    else
-        return 1
-    fi
-}
-
 install_docker() {
     show_header
     log "prompt" "Docker Installation"
     
-    local docker_status
-    check_docker
-    docker_status=$?
+    # Version requirements
+    local min_docker_version="20.10.0"
+    local min_compose_version="2.0.0"
     
-    case $docker_status in
-        0)
-            log "success" "Docker and Docker Compose are already installed."
-            read -p "Would you like to reinstall official Docker packages? (y/N): " REINSTALL
-            [[ $REINSTALL =~ ^[Yy]$ ]] && perform_docker_install
-            ;;
-        1)
-            log "info" "Docker not found. Installing official Docker packages..."
-            perform_docker_install
-            ;;
-        2)
-            log "warning" "Docker is installed but Docker Compose is missing."
-            read -p "Would you like to install Docker Compose? (Y/n): " INSTALL_COMPOSE
-            if [[ ! $INSTALL_COMPOSE =~ ^[Nn]$ ]]; then
-                apt-get update &>/dev/null
-                apt-get install -y docker-compose-plugin &>/dev/null
-            else
-                log "error" "Docker Compose is required for this setup."
-                exit 1
+    # Check if Docker is already installed
+    if command -v docker >/dev/null 2>&1; then
+        local current_docker_version=$(docker --version | cut -d" " -f3 | tr -d ",v")
+        log "info" "Docker ${current_docker_version} is installed"
+        
+        version_compare() {
+            local v1="$1"
+            local v2="$2"
+            
+            # Normalize versions by padding with zeros
+            local ver1=(${v1//./ })
+            local ver2=(${v2//./ })
+            
+            # Fill arrays with zeros if needed
+            while [ ${#ver1[@]} -lt 3 ]; do ver1+=("0"); done
+            while [ ${#ver2[@]} -lt 3 ]; do ver2+=("0"); done
+            
+            for i in {0..2}; do
+                if [ "${ver1[$i]}" -gt "${ver2[$i]}" ]; then
+                    return 0
+                elif [ "${ver1[$i]}" -lt "${ver2[$i]}" ]; then
+                    return 1
+                fi
+            done
+            return 0  # Versions are equal
+        }
+        
+        if ! version_compare "$current_docker_version" "$min_docker_version"; then
+            log "warning" "Docker version ${current_docker_version} is older than minimum required version ${min_docker_version}"
+            log "info" "Recommended to update Docker"
+            read -p "Would you like to reinstall Docker? (y/N): " REINSTALL
+            if [[ ! $REINSTALL =~ ^[Yy]$ ]]; then
+                return 0
             fi
-            ;;
-    esac
+        else
+            log "success" "Docker version is compatible"
+            read -p "Would you like to reinstall Docker anyway? (y/N): " REINSTALL
+            if [[ ! $REINSTALL =~ ^[Yy]$ ]]; then
+                return 0
+            fi
+        fi
+    fi
     
-    # Ensure user is in docker group
-    groupadd -f docker
-    usermod -aG docker "$SELECTED_USER"
+    log "info" "Installing Docker using official installation script..."
+    
+    # Create temporary directory
+    local tmp_dir=$(mktemp -d)
+    cd "$tmp_dir"
+    
+    # Download and verify the installation script
+    echo -n "Downloading Docker installation script... "
+    if curl -fsSL https://get.docker.com -o get-docker.sh; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+        cd - >/dev/null
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+    
+    # Run the installation script
+    echo -n "Installing Docker... "
+    if sh ./get-docker.sh &>/dev/null; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+        cd - >/dev/null
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+    
+    # Clean up
+    cd - >/dev/null
+    rm -rf "$tmp_dir"
     
     # Start and enable Docker service
-    systemctl start docker || {
-        log "error" "Failed to start Docker service"
-        exit 1
-    }
-    systemctl enable docker || {
-        log "error" "Failed to enable Docker service"
-        exit 1
-    }
+    echo -n "Starting Docker service... "
+    if systemctl start docker &>/dev/null && systemctl enable docker &>/dev/null; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+        log "error" "Docker service failed to start. Check logs with: journalctl -xeu docker"
+        return 1
+    fi
+
+    # Verify Docker Compose
+    echo -n "Checking Docker Compose... "
+    if docker compose version &>/dev/null; then
+        local compose_version=$(docker compose version --short)
+        if version_compare "$compose_version" "$min_compose_version"; then
+            echo -e "${GREEN}OK${NC}"
+            log "info" "Docker Compose ${compose_version} detected"
+        else
+            echo -e "${YELLOW}UPDATE RECOMMENDED${NC}"
+            log "warning" "Docker Compose ${compose_version} is older than recommended version ${min_compose_version}"
+        fi
+    else
+        echo -e "${RED}NOT FOUND${NC}"
+        log "error" "Docker Compose not available. Please install Docker Compose separately."
+        return 1
+    fi
     
-    log "success" "Docker setup complete!"
-    log "info" "Note: You'll need to log out and back in for docker group membership to take effect."
-    sleep 3
-    show_header
+    # Add user to docker group
+    if [ -n "$SELECTED_USER" ]; then
+        echo -n "Adding $SELECTED_USER to docker group... "
+        if usermod -aG docker "$SELECTED_USER"; then
+            echo -e "${GREEN}OK${NC}"
+            log "info" "User $SELECTED_USER added to docker group"
+        else
+            echo -e "${RED}FAILED${NC}"
+            log "error" "Failed to add user to docker group"
+            return 1
+        fi
+    fi
+
+    # Print versions
+    docker_version=$(docker --version)
+    compose_version=$(docker compose version)
+    log "success" "Docker installation completed successfully!"
+    log "info" "$docker_version"
+    log "info" "$compose_version"
+
+    # Reminder about group membership
+    if [ -n "$SELECTED_USER" ]; then
+        log "info" "Note: You'll need to log out and back in for docker group membership to take effect."
+    fi
+
+    sleep 2
     return 0
 }
 
-perform_docker_install() {
-    log "info" "Installing Docker..."
-    echo -e "${YELLOW}This may take a minute...${NC}\n"
-    
-    local tmp_log=$(mktemp)
-    local os_id=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
-    local os_codename=$(lsb_release -sc)
-    
-    echo -n "Installing prerequisites... "
-    if apt-get update &> "$tmp_log" && \
-       apt-get install -y \
-       ca-certificates \
-       curl \
-       gnupg \
-       lsb-release \
-       parallel &>> "$tmp_log"; then
-        echo -e "${GREEN}OK${NC}"
+detect_docker_compose_command() {
+    # Try docker compose first (newer method)
+    if docker compose version &>/dev/null; then
+        echo "docker compose"
+        return 0
+    # Then try docker-compose (legacy method)
+    elif command -v docker-compose &>/dev/null; then
+        echo "docker-compose"
+        return 0
     else
-        echo -e "${RED}FAILED${NC}"
-        cat "$tmp_log"
-        rm "$tmp_log"
         return 1
     fi
-    
-    echo -n "Adding Docker repository... "
-    if mkdir -p /etc/apt/keyrings && \
-       case "$os_id" in
-           ubuntu|debian)
-               # Download the correct GPG key and repo URL based on OS
-               curl -fsSL "https://download.docker.com/linux/$os_id/gpg" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg &>> "$tmp_log" && \
-               echo \
-               "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$os_id \
-               $os_codename stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-               ;;
-           *)
-               echo -e "${RED}Unsupported operating system: $os_id${NC}"
-               rm "$tmp_log"
-               return 1
-               ;;
-       esac; then
-        echo -e "${GREEN}OK${NC}"
-    else
-        echo -e "${RED}FAILED${NC}"
-        cat "$tmp_log"
-        rm "$tmp_log"
-        return 1
-    fi
-    
-    echo -n "Installing Docker packages... "
-    if apt-get update &>> "$tmp_log" && \
-       apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin &>> "$tmp_log"; then
-        echo -e "${GREEN}OK${NC}"
-    else
-        echo -e "${RED}FAILED${NC}"
-        cat "$tmp_log"
-        rm "$tmp_log"
-        return 1
-    fi
-    
-    rm "$tmp_log"
-    log "success" "Docker installation completed successfully!"
 }
 
 configure_server_instances() {
@@ -733,7 +993,7 @@ setup_maps() {
         return 0
     fi
     
-    setup_directory "$install_dir/maps" "$SELECTED_USER" || return 1
+    setup_directory "$install_dir/maps/etmain" "$SELECTED_USER" || return 1
     
     show_header
     log "prompt" "Map Repository Selection"
@@ -801,7 +1061,7 @@ setup_maps() {
     echo "This may take a while. Maps will be downloaded in parallel."
 
     parallel --eta --jobs 30 --progress \
-        "wget -q -P \"$install_dir/maps\" \"$repo_url/{}\" 2>/dev/null || 
+        "wget -q -P \"$install_dir/maps/etmain\" \"$repo_url/{}\" 2>/dev/null || 
         echo {} >> \"$failed_maps\"; 
         echo \"Downloaded: {}\"" \
         :::: "$maps_txt" | \
@@ -1057,6 +1317,8 @@ add_watchtower_service() {
     container_name: watchtower
     image: containrrr/watchtower
     command: --enable-lifecycle-hooks
+    networks:
+      - etl
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     labels:
@@ -1150,7 +1412,7 @@ EOL
 
     cat >> docker-compose.yml << EOL
     volumes:
-      - "\${MAPSDIR}:/maps"
+      - "\${MAPSDIR}/etmain:/maps"
       - "\${LOGS}/etl-server$instance:/legacy/homepath/legacy/"
     ports:
       - '\${SERVER${instance}_PORT}:\${SERVER${instance}_PORT}/udp'
@@ -1165,6 +1427,7 @@ generate_docker_compose() {
     local install_dir=$1
     local instances=$2
     local use_watchtower=$3
+    local use_webserver=$4
 
     show_header
     log "prompt" "Generating Docker Compose Configuration"
@@ -1205,9 +1468,15 @@ EOL
     done
 
     # Add Watchtower service if enabled
-    if [[ $use_watchtower =~ ^[Yy]$ ]]; then
-        log "info" "Adding Watchtower service for automatic updates..."
+    if [[ $use_watchtower == "true" ]]; then
+        log "info" "Adding Watchtower service..."
         add_watchtower_service
+    fi
+
+    # Add Webserver service if enabled
+    if [[ $use_webserver == "true" ]]; then
+        log "info" "Adding Webserver service..."
+        add_webserver_service
     fi
 
     log "success" "Docker Compose configuration generated successfully!"
@@ -1227,10 +1496,19 @@ create_helper_script() {
     show_header
     log "prompt" "Creating Server Management Script"
     
+    # Detect which docker compose command to use
+    local compose_cmd
+    compose_cmd=$(detect_docker_compose_command) || {
+        log "error" "No Docker Compose command found"
+        return 1
+    }
+    log "info" "Using Docker Compose command: $compose_cmd"
+    
     cat > "$install_dir/server" << EOL
 #!/bin/bash
 INSTALL_DIR="$install_dir"
 SETTINGS_FILE="\$INSTALL_DIR/settings.env"
+COMPOSE_CMD="$compose_cmd"
 cd "\$INSTALL_DIR" || exit 1
 
 usage() {
@@ -1261,28 +1539,28 @@ case \$ACTION in
     start)
         if [ -z "\$INSTANCE" ]; then
             echo "Starting all servers..."
-            docker compose --env-file=\$SETTINGS_FILE up -d
+            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE up -d
         else
             echo "Starting server \$INSTANCE..."
-            docker compose --env-file=\$SETTINGS_FILE up -d etl-server\$INSTANCE
+            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE up -d etl-server\$INSTANCE
         fi
         ;;
     stop)
         if [ -z "\$INSTANCE" ]; then
             echo "Stopping all servers..."
-            docker compose --env-file=\$SETTINGS_FILE down
+            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE down
         else
             echo "Stopping server \$INSTANCE..."
-            docker compose --env-file=\$SETTINGS_FILE stop etl-server\$INSTANCE
+            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE stop etl-server\$INSTANCE
         fi
         ;;
     restart)
         if [ -z "\$INSTANCE" ]; then
             echo "Restarting all servers..."
-            docker compose --env-file=\$SETTINGS_FILE restart
+            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE restart
         else
             echo "Restarting server \$INSTANCE..."
-            docker compose --env-file=\$SETTINGS_FILE restart etl-server\$INSTANCE
+            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE restart etl-server\$INSTANCE
         fi
         ;;
     *)
@@ -1297,6 +1575,63 @@ EOL
     
     log "success" "Server management script created!"
     sleep 2
+}
+
+configure_webserver() {
+    show_header
+    log "prompt" "Map Download Webserver Configuration"
+    
+    echo -e "${YELLOW}About Map Download Webserver:${NC}"
+    echo -e "• Allows players to download missing maps directly from your server"
+    echo -e "• Minimal resource usage (lightweight HTTP server)"
+    echo -e "• Faster downloads for custom maps and legacy updates\n"
+    
+    read -p "Would you like to enable the map download webserver? (Y/n): " ENABLE_WEBSERVER
+    if [[ ! $ENABLE_WEBSERVER =~ ^[Nn]$ ]]; then
+        log "info" "Configuring webserver..."
+        
+        # Get public IP
+        local public_ip
+        public_ip=$(curl -s 'https://api.ipify.org?format=json' | grep -o '"ip":"[^"]*' | cut -d'"' -f4)
+        
+        if [ -z "$public_ip" ]; then
+            log "warning" "Could not determine public IP. Please enter it manually."
+            read -p "Enter your server's public IP: " public_ip
+        fi
+        
+        echo -e "\n${YELLOW}Your webserver will be available at:${NC} http://$public_ip"
+        
+        local redirect_url="http://$public_ip"
+        add_setting "Additional Settings" "REDIRECTURL" "$redirect_url"
+        
+        # Create legacy folder for maps
+        setup_directory "$INSTALL_DIR/maps/legacy" "$SELECTED_USER" || return 1
+        
+        log "success" "Webserver configuration complete!"
+        export USE_WEBSERVER="true"
+    else
+        log "info" "Webserver will not be enabled"
+        export USE_WEBSERVER="false"
+    fi
+    
+    sleep 2
+    return 0
+}
+
+add_webserver_service() {
+    cat >> docker-compose.yml << EOL
+
+  tinywebserver:
+    container_name: tinywebserver
+    image: ghcr.io/oksii/tinywebserver
+    networks:
+      - etl
+    ports:
+      - "80:8000"
+    volumes:
+      - "\${MAPSDIR}:/data"
+    restart: unless-stopped
+EOL
 }
 
 review_settings() {
@@ -1342,6 +1677,40 @@ review_settings() {
     
     echo
     read -p "Press Enter to continue with these settings, or Ctrl+C to abort..."
+}
+
+post_deployment_tasks() {
+    local install_dir="$1"
+    
+    log "info" "Performing post-deployment tasks..."
+    
+    # Create legacy directory if it doesn't exist
+    setup_directory "$install_dir/maps/legacy" "$SELECTED_USER"
+    
+    # Wait for etl-server1 container to be ready
+    log "info" "Waiting for server container to be ready..."
+    while ! docker container inspect etl-server1 >/dev/null 2>&1 || \
+          [ "$(docker container inspect -f '{{.State.Status}}' etl-server1)" != "running" ]; do
+        log "info" "Waiting for etl-server1 container to be running..."
+        sleep 5
+    done
+    
+    # Copy only .pk3 files from the legacy directory
+    log "info" "Copying legacy pk3 files from server..."
+    
+    # First check if there are any .pk3 files
+    if docker exec etl-server1 bash -c "ls /legacy/server/legacy/*.pk3 2>/dev/null"; then
+        docker exec etl-server1 bash -c "cd /legacy/server/legacy && ls *.pk3" | while read -r file; do
+            log "info" "Copying $file..."
+            docker cp "etl-server1:/legacy/server/legacy/$file" "$install_dir/maps/legacy/"
+        done
+        log "success" "Legacy pk3 files copied successfully"
+    else
+        log "warning" "No .pk3 files found in /legacy/server/legacy/"
+    fi
+    
+    log "success" "Post-deployment tasks completed"
+    sleep 2
 }
 
 main() {
@@ -1395,6 +1764,14 @@ main() {
         exit 1
     }
 
+    # Detect docker compose command
+    local compose_cmd
+    compose_cmd=$(detect_docker_compose_command) || {
+        log "error" "Docker Compose not found. Please install Docker Compose."
+        exit 1
+    }
+    export DOCKER_COMPOSE_CMD="$compose_cmd"
+
     configure_server_instances
     setup_maps "$INSTALL_DIR"
     setup_map_environment
@@ -1403,8 +1780,9 @@ main() {
     setup_volume_paths "$INSTALL_DIR"
     configure_watchtower
     configure_auto_restart || true 
+    configure_webserver
 
-    generate_docker_compose "$INSTALL_DIR" "$INSTANCES" "$USE_WATCHTOWER"
+    generate_docker_compose "$INSTALL_DIR" "$INSTANCES" "$USE_WATCHTOWER" "$USE_WEBSERVER"
 
     read -p "Would you like to review your settings? (Y/n): " REVIEW
     if [[ ! $REVIEW =~ ^[Nn]$ ]]; then
@@ -1422,14 +1800,48 @@ main() {
     chown -R "$SELECTED_USER:$SELECTED_USER" "$INSTALL_DIR"
 
     show_header
-    log "success" "Setup complete! Your ETL servers are now being started..."
+        log "success" "Starting ETL servers..."
+
+        # Check if we're using a newly created user
+        if [[ $USER_OPTION == "2" ]]; then
+            # For new users, start with root first time
+            log "info" "Starting servers with root permissions first time..."
+            cd "$INSTALL_DIR" && ./server start
+        else
+            # For existing users, start as the selected user
+            su - "$SELECTED_USER" -c "cd $INSTALL_DIR && ./server start"
+        fi
+
+    post_deployment_tasks "$INSTALL_DIR"
+
+    show_header 
+    log "success" "Setup complete! Your ETL servers are now running..."
     log ""
     log "info" "Servers are running under user: $SELECTED_USER"
+        
+    if [[ $USER_OPTION == "2" ]]; then
+        log "warning" "Important: For a new user, please:"
+        log "info" "1. Log out of your current session"
+        log "info" "2. Log in as $SELECTED_USER"
+        log "info" "3. Run 'etl-server restart' to ensure proper permissions"
+    fi
+
     log "info" "Use 'etl-server start|stop|restart [instance_number]' to manage your servers"
     log ""
-    log "warning" "Please log out and back in as $SELECTED_USER for docker group membership to take effect"
+    log "info" "Make sure to forward the necessary ports for your servers:" 
 
-    su - "$SELECTED_USER" -c "cd $INSTALL_DIR && ./server start"
+    # Get server ports from settings file
+    log "info" "ETL-Server PORTS (UDP):"
+    for i in $(seq 1 $INSTANCES); do
+        port=$(grep "SERVER${i}_PORT=" "$SETTINGS_FILE" | cut -d'=' -f2)
+        echo -e "  - $port"
+    done
+
+    # Only show webserver port if it was enabled
+    if grep -q "^REDIRECTURL=" "$SETTINGS_FILE"; then
+        log "info" "Webserver PORT (TCP):"
+        echo -e "  - 80"
+    fi
 }
 
 main
