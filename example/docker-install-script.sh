@@ -26,6 +26,8 @@
 # copies or substantial portions of the Software.
 #
 # Tested On:
+# - Ubuntu 24.10 (AMD64/ARM64)
+# - Ubuntu 24.04 LTS (AMD64/ARM64)
 # - Ubuntu 22.04 LTS (AMD64/ARM64)
 # - Ubuntu 22.04 LTS Minimal (AMD64/ARM64)
 # - Debian 11 Bullseye (AMD64/ARM64)
@@ -540,6 +542,7 @@ install_requirements() {
             done
             ;;
             
+
         centos|rhel|amzn|rocky|almalinux)
             # Update package lists for yum-based systems
             echo -n "Updating package lists... "
@@ -550,16 +553,7 @@ install_requirements() {
                 return 1
             fi
 
-            # Update curl first with allow-erasing to handle any conflicts
-            echo -n "Updating/Installing curl... "
-            if $SUDO yum install -y --allow-erasing curl &>/dev/null; then
-                echo -e "${GREEN}OK${NC}"
-            else
-                echo -e "${RED}FAILED${NC}"
-                return 1
-            fi
-
-            # First ensure epel-release is installed for non-Amazon systems
+            # Install EPEL
             if [ "$os_type" != "amzn" ]; then
                 echo -n "Installing EPEL repository... "
                 if $SUDO yum install -y epel-release &>/dev/null; then
@@ -578,11 +572,12 @@ install_requirements() {
                 ca-certificates
             )
             
+            # Install packages
             for package in "${packages[@]}"; do
                 echo -n "Installing $package... "
                 if rpm -q "$package" &>/dev/null; then
                     echo -e "${GREEN}ALREADY INSTALLED${NC}"
-                elif $SUDO yum install -y --allow-erasing "$package" &>/dev/null; then
+                elif $SUDO yum install -y "$package" &>/dev/null; then
                     echo -e "${GREEN}OK${NC}"
                 else
                     echo -e "${RED}FAILED${NC}"
@@ -598,7 +593,7 @@ install_requirements() {
             return 1
             ;;
     esac
-    
+
     log "success" "All required packages installed successfully!"
     sleep 2
     return 0
