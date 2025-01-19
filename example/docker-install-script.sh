@@ -378,7 +378,7 @@ setup_installation_directory() {
     log "prompt" "User's Home Directory: $user_home\n"
     echo
     echo
-    read -p "Install to default path: [default=$default_dir] (Y/n): " USE_DEFAULT
+    read -p "Install to default path: [default: $default_dir] (Y/n): " USE_DEFAULT
     
     if [[ ! $USE_DEFAULT =~ ^[Nn]$ ]]; then
         install_dir="$default_dir"
@@ -656,7 +656,7 @@ setup_user() {
     echo
     
     while true; do
-        read -p "Select option (1-3) [default=$suggested_option]: " USER_OPTION
+        read -p "Select option (1-3) [default: $suggested_option]: " USER_OPTION
         USER_OPTION=${USER_OPTION:-$suggested_option}
         
         case $USER_OPTION in
@@ -1008,7 +1008,7 @@ setup_maps() {
     echo
     echo
     
-    read -p "Use persistent volume for maps? [default=1] (Y/n): " PREDOWNLOAD
+    read -p "Use persistent volume for maps? [default: 1] (Y/n): " PREDOWNLOAD
     export PREDOWNLOAD
     
     if [[ $PREDOWNLOAD =~ ^[Nn]$ ]]; then
@@ -1027,7 +1027,7 @@ setup_maps() {
     log "" "  3. Custom repository URL$"
     echo
     echo
-    read -p "Select repository [default=1] (1-3): " REPO_CHOICE
+    read -p "Select repository [default: 1] (1-3): " REPO_CHOICE
     
     case $REPO_CHOICE in
         1) repo_url="https://dl.etl.lol/maps/et/etmain" ;;
@@ -1399,7 +1399,7 @@ setup_stats_variables() {
     log "prompt" "Stats will automatically be submitted to https://stats.etl.lol"
     echo
     echo
-    read -p "Would you like to enable stats submission? [default=yes] (Y/n): " ENABLE_STATS
+    read -p "Would you like to enable stats submission? [default: yes] (Y/n): " ENABLE_STATS
     
     if [[ ! $ENABLE_STATS =~ ^[Nn]$ ]]; then
         store_setting "Stats Configuration" "STATS_SUBMIT" "true"
