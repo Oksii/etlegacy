@@ -1536,7 +1536,7 @@ generate_service() {
     
     # Get hostname with default
     local default_hostname="ETL-Server $instance"
-    read -p "Server Name          [default: $default_hostname]: " hostname
+    read -p "Server Name           [default: $default_hostname]: " hostname
     hostname=${hostname:-"$default_hostname"}
     echo
     log "prompt" "Security Settings (Can be chaned later):"
@@ -2104,7 +2104,7 @@ main() {
     echo
 
     # Server Ports
-    log "prompt" "ETL-Server PORTS (UDP):"
+    log "prompt" "ETL-Server ports (udp):"
     for i in $(seq 1 $INSTANCES); do
         port=$(grep "SERVER${i}_MAP_PORT=" "$SETTINGS_FILE" | cut -d'=' -f2)
         if [ ! -z "$port" ]; then
@@ -2116,12 +2116,12 @@ main() {
     if grep -q "^REDIRECTURL=" "$SETTINGS_FILE"; then
         echo
         redirect_url=$(grep "^REDIRECTURL=" "$SETTINGS_FILE" | cut -d'=' -f2)
-        log "prompt" "Webserver URL:"
+        log "prompt" "Webserver URL (tcp port 80):"
         printf "${CYAN}  └─ ${redirect_url}${NC}\n"
     fi
 
     echo
-    log "prompt" "Setup Complete - Happy Gaming!"
+    log "warning" "Setup Complete!"
     echo
 
 }
