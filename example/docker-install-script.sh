@@ -87,7 +87,6 @@ DEFAULT_MAPS="adlernest braundorf_b4 bremen_b3 decay_sw erdenberg_t2 et_brewdog_
 
 DEBUG=${DEBUG:-0}
 
-
 log() {
     local level=$1
     shift
@@ -140,144 +139,147 @@ get_os_type() {
     echo "$os_id"
 }
 
-prompt_with_default() {
-    local prompt=$1
-    local default=$2
-    local help_text="${3:-}"
+# Initialize settings storage and files
+init_settings_manager() {
+    local install_dir="$1"
+    local selected_user="$2"
     
-    # Show help text if provided
-    if [ ! -z "$help_text" ]; then
-        echo -e "${YELLOW}${help_text}${NC}\n"
+    # Create settings file if it doesn't exist
+    if [ ! -f "$install_dir/settings.env" ]; then
+        touch "$install_dir/settings.env"
+        chown "$selected_user:$selected_user" "$install_dir/settings.env"
     fi
     
-    echo -e "${CYAN}${prompt}${NC}"
-    echo -e "${BLUE}Default: ${BOLD}${default}${NC}\n"
-    read -p "> " value
-    echo "${value:-$default}"
+    # Initialize associative arrays for settings
+    declare -g -A GLOBAL_SETTINGS=()
+    declare -g -A INSTANCE_SETTINGS=()
+    declare -g -A REQUIRED_SETTINGS=()
+    
+    # Store core version setting
+    store_setting "Core" "VERSION" "stable"
 }
 
-add_setting() {
-    local category=$1
-    local key=$2
-    local value=$3
+# Store a setting with optional category
+store_setting() {
+    local category="$1"
+    local key="$2"
+    local value="$3"
+    local is_global="${4:-false}"
     
-    # Create temp file
+    # Sanitize the value
+    value=$(echo "$value" | sed 's/"/\\"/g')
+    
+    if [ "$is_global" = "true" ]; then
+        GLOBAL_SETTINGS["$key"]="$value"
+    fi
+    
+    # Add category comment if it's the first setting in this category
+    if ! grep -q "# $category" "$SETTINGS_FILE" 2>/dev/null; then
+        echo -e "\n# $category" >> "$SETTINGS_FILE"
+    fi
+    
+    # Update or add setting in file
+    if grep -q "^$key=" "$SETTINGS_FILE" 2>/dev/null; then
+        sed -i "s|^$key=.*|$key=$value|" "$SETTINGS_FILE"
+    else
+        echo "$key=$value" >> "$SETTINGS_FILE"
+    fi
+}
+
+# Store an instance-specific setting
+store_server_setting() {
+    local instance="$1"
+    local key="$2"
+    local value="$3"
+    
+    # Format the instance-specific key
+    local instance_key="SERVER${instance}_${key}"
+    
+    # Sanitize the value
+    value=$(echo "$value" | sed 's/"/\\"/g')
+    
+    INSTANCE_SETTINGS["$instance_key"]="$value"
+    
+    # Update or add setting in file
+    if grep -q "^$instance_key=" "$SETTINGS_FILE" 2>/dev/null; then
+        sed -i "s|^$instance_key=.*|$instance_key=$value|" "$SETTINGS_FILE"
+    else
+        echo "$instance_key=$value" >> "$SETTINGS_FILE"
+    fi
+}
+
+review_settings() {
+    show_header
+    log "prompt" "Settings Review"
+    
+    echo -e "${YELLOW}Current Settings Configuration:${NC}\n"
+    
+    if [ -f "$SETTINGS_FILE" ]; then
+        local current_category=""
+        while IFS= read -r line; do
+            # Handle comment lines (categories)
+            if [[ "$line" =~ ^#[[:space:]](.+)$ ]]; then
+                current_category="${BASH_REMATCH[1]}"
+                echo -e "\n${BLUE}${current_category}:${NC}"
+            # Handle actual settings
+            elif [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                local key="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]}"
+                echo -e "  ${BOLD}${key}${NC}: $value"
+            fi
+        done < "$SETTINGS_FILE"
+        
+        echo -e "\nPress any key to continue..."
+        read -n 1
+    else
+        log "error" "Settings file not found!"
+        sleep 2
+    fi
+}
+
+# Reorganize settings file - we like things organized
+reorganize_settings_file() {
     local temp_file=$(mktemp)
     
-    # If file is empty, initialize it
-    if [ ! -s "$SETTINGS_FILE" ]; then
-        initialize_settings_file "$INSTALL_DIR" "$CURRENT_USER"
-    fi
-    
-    # Determine the correct category based on key prefix
-    if [[ $key == STATS_* ]]; then
-        category="Stats Configuration"
-    elif [[ $key == SERVER[0-9]_* ]]; then
-        category="Server Configurations"
-    elif [[ $key == "LOGS" || $key == "MAPSDIR" ]]; then
-        category="Volumes"
-    elif [[ $key == "MAPS" ]]; then
-        category="Map Settings"
-    else
-        category="Additional Settings"
-    fi
-    
-    local in_correct_section=false
-    local setting_written=false
-    local current_section=""
-    
-    while IFS= read -r line || [ -n "$line" ]; do
-        # Handle section headers
-        if [[ $line =~ ^#[[:space:]]*(.*)[[:space:]]*$ ]]; then
-            current_section="${BASH_REMATCH[1]}"
-            echo "$line" >> "$temp_file"
-            
-            if [ "$current_section" = "$category" ] && [ "$setting_written" = false ]; then
-                # For server configurations, group by instance
-                if [[ $key =~ ^SERVER([0-9]+)_ ]]; then
-                    local instance="${BASH_REMATCH[1]}"
-                    # Only add if we haven't already written this server's settings
-                    if ! grep -q "^# ETL Server \".*\" ($instance)$" "$temp_file"; then
-                        echo -e "\n# ETL Server \"$hostname\" ($instance)" >> "$temp_file"
-                        echo "$key=$value" >> "$temp_file"
-                        setting_written=true
-                    fi
-                else
-                    echo "$key=$value" >> "$temp_file"
-                    setting_written=true
-                fi
-            fi
-            continue
-        fi
-        
-        # Skip existing setting if we're updating it
-        if [[ $line =~ ^$key= ]]; then
-            continue
-        fi
-        
-        echo "$line" >> "$temp_file"
-    done < "$SETTINGS_FILE"
-    
-    # If setting wasn't written, add it to the appropriate section
-    if [ "$setting_written" = false ]; then
-        if ! grep -q "^# $category$" "$temp_file"; then
-            echo -e "\n# $category" >> "$temp_file"
-        fi
-        
-        if [[ $key =~ ^SERVER([0-9]+)_ ]]; then
-            local instance="${BASH_REMATCH[1]}"
-            echo -e "\n# ETL Server \"$hostname\" ($instance)" >> "$temp_file"
-        fi
-        echo "$key=$value" >> "$temp_file"
-    fi
-    
-    mv "$temp_file" "$SETTINGS_FILE"
-    chmod 644 "$SETTINGS_FILE"
-}
+    # Add core settings first
+    cat > "$temp_file" << EOL
+# Core
+VERSION=stable
 
-# Function to show info with auto-skip or forced input
-show_info_with_timeout() {
-    local message="$1"
-    local force_input="${2:-false}"  # Default to false if not provided
-    local default_value="${3:-}"     # Empty string if not provided
-    local prompt_symbol="${4:->}"    # Default to ">" if not provided
-    local timeout=5
-    local input=""
+EOL
+
+    echo "# Volumes" >> "$temp_file"
+    grep "^MAPSDIR=" "$SETTINGS_FILE" >> "$temp_file" || true
+    grep "^LOGS=" "$SETTINGS_FILE" >> "$temp_file" || true
     
-    echo -e "$message"
+    echo -e "\n# Map Settings" >> "$temp_file"
+    grep "^MAPS=" "$SETTINGS_FILE" >> "$temp_file" || true
     
-    if [ "$force_input" = "true" ]; then
-        echo -e "\n${YELLOW}Continue? (Y/n):${NC}"
-        read -p "$prompt_symbol " input
-        echo "${input:-$default_value}"
-        return 0
-    fi
-    
-    if [ -n "$default_value" ]; then
-        echo -e "\n${YELLOW}Enter response or wait ${timeout} seconds for default: ${BLUE}$default_value${NC}"
-    else
-        echo -e "\n${YELLOW}Press Enter to continue or wait ${timeout} seconds${NC}"
-    fi
-    
-    # Start timeout read with countdown
-    while [ $timeout -gt 0 ]; do
-        echo -en "\r${BLUE}$timeout${NC} seconds..."
-        if read -t 1 -n 1 input; then
-            echo
-            [ -n "$input" ] && echo "$input" || echo "$default_value"
-            return 0
+    echo -e "\n# Additional Settings" >> "$temp_file"
+    # Find all global settings that don't belong to other categories
+    grep -v "^SERVER[0-9]\+_\|^VERSION=\|^MAPSDIR=\|^LOGS=\|^MAPS=\|^STATS_" "$SETTINGS_FILE" | \
+    while read -r line; do
+        if [[ -n "$line" && ! "$line" =~ ^#.* ]]; then
+            echo "$line" >> "$temp_file"
         fi
-        ((timeout--))
     done
     
-    # If we get here, the timeout occurred
-    echo -e "\r${GREEN}Continuing...     ${NC}"
-    [ -n "$default_value" ] && echo "$default_value"
-    
-    # Clear any pending input
-    read -t 0.1 -n 100 input 2>/dev/null || true  
-    echo -en "\r\033[K"  # Clear the current line
-    return 0
+    echo -e "\n# Stats Configuration" >> "$temp_file"
+    grep "^STATS_" "$SETTINGS_FILE" >> "$temp_file" || true
+
+    # Group server settings by instance
+    while read -r instance; do
+        if [ -n "$instance" ]; then
+            # Get hostname for this instance
+            hostname=$(grep "^${instance}_HOSTNAME=" "$SETTINGS_FILE" | cut -d'=' -f2)
+            [ -z "$hostname" ] && hostname="ETL-Server ${instance#SERVER}"
+
+            echo -e "\n# Server: $hostname" >> "$temp_file"
+            grep "^${instance}_" "$SETTINGS_FILE" | sort >> "$temp_file"
+        fi
+    done < <(grep "^SERVER[0-9]\+_" "$SETTINGS_FILE" | cut -d'_' -f1 | sort -u)
+
+    mv "$temp_file" "$SETTINGS_FILE"
 }
 
 setup_installation_directory() {
@@ -345,41 +347,6 @@ setup_installation_directory() {
         log "error" "Failed to setup installation directory"
         return 1
     fi
-}
-
-initialize_settings_file() {
-    local install_dir="$1"
-    local current_user="$2"
-    local settings_file="$install_dir/settings.env"
-    local current_date=$(date -u +"%Y-%m-%d %H:%M:%S")
-    
-    cat > "$settings_file" << EOL
-# ETLegacy Server Configuration
-# Generated on $current_date UTC
-# Created by $current_user
-
-# Using version 'stable' for etlegacy. For more available builds see: https://hub.docker.com/repository/docker/oksii/etlegacy/tags
-VERSION=stable
-
-# Volumes
-
-# Map Settings
-
-# Stats Configuration
-
-# Additional Settings
-
-# Server Configurations
-
-EOL
-
-    # Set proper ownership
-    if ! chown "$SELECTED_USER:$SELECTED_USER" "$settings_file"; then
-        log "error" "Failed to set ownership of $settings_file"
-        return 1
-    fi
-    
-    return 0
 }
 
 setup_directory() {
@@ -464,37 +431,6 @@ check_root() {
     fi
 }
 
-check_resources() {
-    show_header
-    log "prompt" "Checking System Resources..."
-    
-    local cpu_cores=$(nproc)
-    local total_mem=$(free -m | awk '/^Mem:/{print $2}')
-    local disk_space=$(df -m "$HOME" | awk 'NR==2 {print $4}')
-    
-    echo -e "${BLUE}CPU Cores:${NC} $cpu_cores"
-    echo -e "${BLUE}Total Memory:${NC} $total_mem MB"
-    echo -e "${BLUE}Available Disk Space:${NC} $disk_space MB\n"
-    
-    local warnings=()
-    [ "$cpu_cores" -lt 2 ] && warnings+=("Low CPU cores detected (minimum recommended: 2)")
-    [ "$total_mem" -lt 1024 ] && warnings+=("Low memory detected (minimum recommended: 1GB)")
-    [ "$disk_space" -lt 2048 ] && warnings+=("Low disk space detected (minimum recommended: 2GB)")
-    
-    if [ ${#warnings[@]} -gt 0 ]; then
-        log "warning" "Resource Warnings:"
-        for warning in "${warnings[@]}"; do
-            echo -e "${YELLOW}• $warning${NC}"
-        done
-        show_info_with_timeout "Review the warnings above." "true" || true 
-    else
-        log "success" "System resources look good!"
-        show_info_with_timeout "All resource checks passed." || true 
-    fi
-    
-    return 0 
-}
-
 install_requirements() {
     show_header
     log "prompt" "Installing Required Packages..."
@@ -530,9 +466,7 @@ install_requirements() {
             
             for package in "${packages[@]}"; do
                 echo -n "Installing $package... "
-                if dpkg -l | grep -q "^ii  $package "; then
-                    echo -e "${GREEN}ALREADY INSTALLED${NC}"
-                elif $SUDO apt-get install -y "$package" &>/dev/null; then
+                if $SUDO apt-get install -y "$package" &>/dev/null; then
                     echo -e "${GREEN}OK${NC}"
                 else
                     echo -e "${RED}FAILED${NC}"
@@ -575,9 +509,7 @@ install_requirements() {
             # Install packages
             for package in "${packages[@]}"; do
                 echo -n "Installing $package... "
-                if rpm -q "$package" &>/dev/null; then
-                    echo -e "${GREEN}ALREADY INSTALLED${NC}"
-                elif $SUDO yum install -y "$package" &>/dev/null; then
+                if $SUDO yum install -y "$package" &>/dev/null; then
                     echo -e "${GREEN}OK${NC}"
                 else
                     echo -e "${RED}FAILED${NC}"
@@ -972,6 +904,7 @@ setup_maps() {
     echo -e "• Faster server startup times"
     echo -e "• Reduced bandwidth usage"
     echo -e "• Ideal for multiple server instances"
+    echo -e "• Allows us to setup a webserver for wwwDownloads"
     
     echo -e "\n${BLUE}Option 2: Container Downloads${NC}"
     echo -e "• Each container downloads maps on startup"
@@ -992,7 +925,7 @@ setup_maps() {
     
     show_header
     log "prompt" "Map Repository Selection"
-    echo -e "1. ${BLUE}dl.etl.lol${NC}"
+    echo -e "1. ${BLUE}dl.etl.lol${NC} (comp maps only)"
     echo -e "2. ${BLUE}download.hirntot.org${NC} (Alternative)"
     echo -e "3. ${BLUE}Custom repository URL${NC}\n"
     
@@ -1021,8 +954,10 @@ setup_maps() {
     
     # Ask for additional maps
     echo -e "\n${YELLOW}Would you like to add more maps to the default list?${NC}"
+    echo -e "${BLUE}The full mapname is required.${NC}"
+    echo -e "${BLUE}Maps may not be available, you can add them to maps/ folder manually later.${NC}"
     echo -e "${BLUE}Examples of additional maps:${NC}"
-    echo -e "• etl_base, mp_sillyctf"
+    echo -e "• etl_base_v3, mp_sillyctf"
     echo -e "• goldendunk_a2, te_rifletennis"
     echo -e "• ctf_multi ctf_well${NC}\n"
     
@@ -1038,33 +973,43 @@ setup_maps() {
         fi
     fi
     
+    # Create temporary files for map processing
     > "$maps_txt"
     > "$failed_maps"
+
+    # Process maps and store in settings
     local maps_env=""
-    
     for map in $maplist; do
         map=$(check_pk3 "$map")
         echo "$map" >> "$maps_txt"
         map_name=$(basename "$map" ".pk3")
         maps_env="${maps_env}${map_name}:"
     done
-    
-    # Write maps to settings file
-    add_setting "Map Settings" "MAPS" "${maps_env%:}"
 
+    store_setting "Map Settings" "MAPS" "${maps_env%:}"
+
+    # Download maps
     log "info" "Starting map downloads from $repo_url..."
     echo "This may take a while. Maps will be downloaded in parallel."
+
+    # Use a temporary file for download progress
+    local progress_file=$(mktemp)
 
     parallel --eta --jobs 30 --progress \
         "wget -q -P \"$install_dir/maps/etmain\" \"$repo_url/{}\" 2>/dev/null || 
         echo {} >> \"$failed_maps\"; 
-        echo \"Downloaded: {}\"" \
-        :::: "$maps_txt" | \
+        echo \"Downloaded: {}\" >> \"$progress_file\"" \
+        :::: "$maps_txt"
+
+    # Display download results
+    if [ -f "$progress_file" ]; then
         while IFS= read -r line; do
             if [[ $line == Downloaded:* ]]; then
                 echo -e "${GREEN}✓${NC} ${line#Downloaded: }"
             fi
-        done
+        done < "$progress_file"
+        rm -f "$progress_file"
+    fi
     
     # Check for failed downloads
     if [ -s "$failed_maps" ]; then
@@ -1079,7 +1024,7 @@ setup_maps() {
 
     # Cleanup
     rm -f "$maps_txt" "$failed_maps"
-    sleep 2
+    sleep 3
     
     show_header
 }
@@ -1117,163 +1062,246 @@ setup_map_environment() {
         done
     fi
     
-    echo "MAPS=$maps_env" >> $SETTINGS_FILE
-    echo "REDIRECTURL=https://download.hirntot.org" >> $SETTINGS_FILE
+    # Store settings
+    store_setting "Map Settings" "MAPS" "$maps_env"
+    store_setting "Additional Settings" "REDIRECTURL" "https://download.hirntot.org"
     
     log "success" "Map download configuration completed!"
     sleep 2
 }
 
-configure_additional_variables() {
-    local instances=$1
+configure_setting() {
+    local setting="$1"
+    local default="$2"
+    local description="$3"
+    local category="$4"
+    local is_global="${5:-false}"
     
+    show_header
+    log "prompt" "$setting Configuration"
+    echo -e "${YELLOW}$description${NC}\n"
+    
+    read -p "Enter value for $setting [default: $default]: " value
+    value=${value:-$default}
+    
+    # If multiple instances are configured, handle per-server settings
+    if [ "$INSTANCES" -gt 1 ] && [ "$is_global" != "true" ]; then
+        echo -e "\nApply this setting:"
+        echo -e "1. ${BLUE}Globally${NC} (all instances)"
+        echo -e "2. ${BLUE}Per-server${NC} (specific instances)\n"
+        
+        read -p "Choose option (1/2) [default: 1]: " scope
+        scope=${scope:-1}
+        
+        if [ "$scope" = "2" ]; then
+            for i in $(seq 1 $INSTANCES); do
+                echo -e "\nApply to Server $i? (Y/n)"
+                read -p "> " apply
+                if [[ ! $apply =~ ^[Nn]$ ]]; then
+                    store_server_setting "$i" "$setting" "$value"
+                fi
+            done
+        else
+            store_setting "$category" "$setting" "$value" "true"
+        fi
+    else
+        store_setting "$category" "$setting" "$value" "$is_global"
+    fi
+}
+
+# Configure server settings
+configure_server_settings() {
     while true; do
         show_header
-        log "prompt" "Additional Configuration Options"
-        echo -e "The following settings are optional. Default values will be used if skipped.\n"
+        log "prompt" "Server Configuration Settings"
+        echo -e "${YELLOW}Configure server settings. Default values will be used if skipped.${NC}\n"
+        echo -e "${YELLOW}Most of these can be left alone. You can always change them later.${NC}\n"
+        echo -e "${YELLOW}See https://github.com/Oksii/etlegacy${NC}\n\n"
         
-        echo -e "1. ${BLUE}STARTMAP${NC} - Starting map (default: radar)"
-        echo -e "2. ${BLUE}MAXCLIENTS${NC} - Maximum players (default: 32)"
-        echo -e "3. ${BLUE}AUTO_UPDATE${NC} - Auto-update configs (default: true)"
-        echo -e "4. ${BLUE}SETTINGSURL${NC} - Config repository URL"
-        echo -e "5. ${BLUE}Advanced Options${NC} - Additional settings"
-        echo -e "6. ${GREEN}Done${NC}\n"
+        echo -e "Basic Settings:"
+        echo -e "1. ${BLUE}STARTMAP${NC}          - Starting map (default: radar)"
+        echo -e "2. ${BLUE}MAXCLIENTS${NC}        - Maximum players (default: 32)"
+        echo -e "3. ${BLUE}AUTO_UPDATE${NC}       - Auto-update configs (default: true)"
+        echo -e "4. ${BLUE}CONF_MOTD${NC}         - Message of the day"
+        echo -e "5. ${BLUE}SERVERCONF${NC}        - Config to load (default: legacy6)"
+        echo -e "6. ${BLUE}TIMEOUTLIMIT${NC}      - Max pauses per side (default: 1)"
+        echo -e "7. ${BLUE}ETLTV Settings${NC}    - Configure ETLTV options"
+        echo -e "8. ${BLUE}Advanced Settings${NC} - Configure advanced options"
+        echo -e "9. ${GREEN}Done${NC}\n"
         
-        read -p "Select option (1-6) [default: 6]: " option
-        option=${option:-6}
+        read -p "Select option (1-9) [default: 9]: " option
+        option=${option:-9}
+        
         case $option in
-            1)
-                show_header
-                log "prompt" "STARTMAP Configuration"
-                echo -e "${YELLOW}The starting map is the map that loads when the server starts.${NC}\n"
-                read -p "Configure STARTMAP globally or per-server? (G/s): " scope
-                if [[ $scope =~ ^[Ss]$ ]]; then
-                    for i in $(seq 1 $instances); do
-                        local startmap=$(prompt_with_default "Enter STARTMAP for server$i" "radar" "This map will be loaded when server$i starts.")
-                        echo "SERVER${i}_STARTMAP=$startmap" >> $SETTINGS_FILE
-                    done
-                else
-                    local startmap=$(prompt_with_default "Enter global STARTMAP" "radar" "This map will be loaded when any server starts.")
-                    echo "STARTMAP=$startmap" >> $SETTINGS_FILE
-                fi
-                ;;
-            2)
-                show_header
-                log "prompt" "MAXCLIENTS Configuration"
-                echo -e "${YELLOW}Maximum number of players that can connect to the server.${NC}\n"
-                read -p "Configure MAXCLIENTS globally or per-server? (G/s): " scope
-                if [[ $scope =~ ^[Ss]$ ]]; then
-                    for i in $(seq 1 $instances); do
-                        local maxclients=$(prompt_with_default "Enter MAXCLIENTS for server$i" "32" "Maximum players allowed on server$i.")
-                        echo "SERVER${i}_MAXCLIENTS=$maxclients" >> $SETTINGS_FILE
-                    done
-                else
-                    local maxclients=$(prompt_with_default "Enter global MAXCLIENTS" "32" "Maximum players allowed on all servers.")
-                    echo "MAXCLIENTS=$maxclients" >> $SETTINGS_FILE
-                fi
-                ;;
-            3)
-                show_header
-                log "prompt" "AUTO_UPDATE Configuration"
-                echo -e "${YELLOW}Enable automatic updates of server configurations on restart?${NC}\n"
-                local autoupdate=$(prompt_with_default "Enable AUTO_UPDATE" "true" "Set to 'false' to disable automatic updates.")
-                echo "AUTO_UPDATE=$autoupdate" >> $SETTINGS_FILE
-                ;;
-            4)
-                show_header
-                log "prompt" "SETTINGSURL Configuration"
-                echo -e "${YELLOW}URL for the Git repository containing server configurations.${NC}\n"
-                local settingsurl=$(prompt_with_default "Enter SETTINGSURL" "https://github.com/Oksii/legacy-configs.git" "Public Git repository URL for server configurations.")
-                echo "SETTINGSURL=$settingsurl" >> $SETTINGS_FILE
-                ;;
-            5)
-                configure_advanced_options "$instances"
-                ;;
-            6)
-                break
-                ;;
-            *)
-                log "warning" "Invalid option"
-                sleep 1
-                ;;
+            1) configure_setting "STARTMAP" "radar" "Map server starts on" "Server Settings" ;;
+            2) configure_setting "MAXCLIENTS" "32" "Maximum number of players" "Server Settings" ;;
+            3) configure_setting "AUTO_UPDATE" "true" "Update configurations on restart" "Server Settings" "true" ;;
+            4) configure_setting "CONF_MOTD" "" "Message of the day shown on connect" "Server Settings" ;;
+            5) configure_setting "SERVERCONF" "legacy6" "Configuration to load on startup" "Server Settings" ;;
+            6) configure_setting "TIMEOUTLIMIT" "1" "Maximum number of pauses per map side" "Server Settings" ;;
+            7) configure_etltv_menu ;;
+            8) configure_advanced_settings ;;
+            9) break ;;
+            *) log "warning" "Invalid option" ; sleep 1 ;;
         esac
     done
 }
 
-configure_advanced_options() {
-    local instances=$1
-    
+
+# Configure advanced settings
+configure_advanced_settings() {
     while true; do
         show_header
-        log "prompt" "Advanced Configuration Options"
+        log "prompt" "Advanced Configuration Settings"
         echo -e "${YELLOW}Warning: These settings are for advanced users. Use default values if unsure.${NC}\n"
         
-        echo -e "1. ${BLUE}SVTRACKER${NC} - Server tracker endpoint"
-        echo -e "2. ${BLUE}XMAS${NC} - Enable XMAS mode"
-        echo -e "3. ${BLUE}SETTINGSBRANCH${NC} - Git branch for configs"
-        echo -e "4. ${BLUE}ADDITIONAL_CLI_ARGS${NC} - Additional command line arguments"
-        echo -e "5. ${GREEN}Back to main menu${NC}\n"
+        echo -e "1. ${BLUE}Download Settings${NC}   - Configure REDIRECTURL"
+        echo -e "2. ${BLUE}Tracker Settings${NC}    - Configure SVTRACKER"
+        echo -e "3. ${BLUE}XMAS Settings${NC}       - Configure XMAS options"
+        echo -e "4. ${BLUE}Repository Settings${NC} - Configure git settings"
+        echo -e "5. ${BLUE}Demo Settings${NC}       - Configure SVAUTODEMO"
+        echo -e "6. ${BLUE}CLI Settings${NC}        - Configure additional arguments"
+        echo -e "7. ${GREEN}Back${NC}\n"
         
-        read -p "Select option (1-5) [default: 5]: " option
-        option=${option:-5}
+        read -p "Select option (1-7) [default: 7]: " option
+        option=${option:-7}
+        
         case $option in
-            1)
-                local tracker=$(prompt_with_default "Enter SVTRACKER endpoint" "tracker.etl.lol:4444" "Server tracking service endpoint.")
-                echo "SVTRACKER=$tracker" >> $SETTINGS_FILE
-                ;;
-            2)
-                show_header
-                log "prompt" "XMAS Configuration"
-                echo -e "${YELLOW}Enable Christmas themed content?${NC}\n"
-                read -p "Enable XMAS mode? (y/N): " ENABLE_XMAS
-                if [[ $ENABLE_XMAS =~ ^[Yy]$ ]]; then
-                    echo "XMAS=true" >> $SETTINGS_FILE
-                    local xmas_url=$(prompt_with_default "Enter XMAS_URL" "" "URL for downloading xmas.pk3 (leave empty for default)")
-                    [ ! -z "$xmas_url" ] && echo "XMAS_URL=$xmas_url" >> $SETTINGS_FILE
-                fi
-                ;;
-            3)
-                local branch=$(prompt_with_default "Enter SETTINGSBRANCH" "main" "Git branch for server configurations.")
-                echo "SETTINGSBRANCH=$branch" >> $SETTINGS_FILE
-                ;;
-            4)
-                show_header
-                log "prompt" "Additional Command Line Arguments"
-                echo -e "${YELLOW}Specify additional arguments to pass to the server.${NC}"
-                echo -e "${YELLOW}Example: +set sv_tracker \"et.trackbase.com:4444\" +set sv_autodemo 2${NC}\n"
-                read -p "Enter additional arguments: " cli_args
-                [ ! -z "$cli_args" ] && echo "ADDITIONAL_CLI_ARGS=\"$cli_args\"" >> $SETTINGS_FILE
-                ;;
-            5) return 0 ;;
-            *) log "warning" "Invalid option" ;;
+            1) configure_setting "REDIRECTURL" "" "URL for HTTP downloads" "Download Settings" "true" ;;
+            2) configure_setting "SVTRACKER" "" "Server tracker endpoint" "Tracker Settings" "true" ;;
+            3) configure_xmas_menu ;;
+            4) configure_repo_menu ;;
+            5) configure_setting "SVAUTODEMO" "0" "Auto demo recording (0=off, 1=always, 2=if players connected)" "Demo Settings" "true" ;;
+            6) configure_setting "ADDITIONAL_CLI_ARGS" "" "Additional command line arguments" "CLI Settings" "true" ;;
+            7) return 0 ;;
+            *) log "warning" "Invalid option" ; sleep 1 ;;
         esac
     done
 }
+
+configure_etltv_menu() {
+    while true; do
+        show_header
+        log "prompt" "ETLTV Settings"
+        echo -e "${YELLOW}Configure ETLTV settings for demo recording and streaming.${NC}\n"
+        
+        echo -e "1. ${BLUE}SVETLTVMAXSLAVES${NC} - Max ETLTV slaves (default: 2)"
+        echo -e "2. ${BLUE}SVETLTVPASSWORD${NC}  - ETLTV password (default: 3tltv)"
+        echo -e "3. ${GREEN}Back${NC}\n"
+        
+        read -p "Select option (1-3) [default: 3]: " option
+        option=${option:-3}
+        
+        case $option in
+            1)
+                configure_setting "SVETLTVMAXSLAVES" "2" \
+                    "Maximum amount of ETLTV slaves" \
+                    "ETLTV" "true"
+                ;;
+            2)
+                configure_setting "SVETLTVPASSWORD" "3tltv" \
+                    "Password for ETLTV slaves" \
+                    "ETLTV" "true"
+                ;;
+            3) return 0 ;;
+            *) log "warning" "Invalid option" ; sleep 1 ;;
+        esac
+    done
+}
+
+configure_xmas_menu() {
+    while true; do
+        show_header
+        log "prompt" "XMAS Settings"
+        echo -e "${YELLOW}Configure Christmas themed content settings.${NC}\n"
+        
+        echo -e "1. ${BLUE}XMAS${NC}      - Enable XMAS content (default: false)"
+        echo -e "2. ${BLUE}XMAS_URL${NC}  - URL to download xmas.pk3"
+        echo -e "3. ${GREEN}Back${NC}\n"
+        
+        read -p "Select option (1-3) [default: 3]: " option
+        option=${option:-3}
+        
+        case $option in
+            1)
+                configure_setting "XMAS" "false" \
+                    "Enable XMAS content" \
+                    "XMAS" "true"
+                ;;
+            2)
+                configure_setting "XMAS_URL" "" \
+                    "URL to download xmas.pk3" \
+                    "XMAS" "true"
+                ;;
+            3) return 0 ;;
+            *) log "warning" "Invalid option" ; sleep 1 ;;
+        esac
+    done
+}
+
+configure_repo_menu() {
+    while true; do
+        show_header
+        log "prompt" "Repository Settings"
+        echo -e "${YELLOW}Configure git repository settings.${NC}\n"
+        
+        echo -e "1. ${BLUE}SETTINGSURL${NC}    - Github repository URL"
+        echo -e "2. ${BLUE}SETTINGSPAT${NC}    - Github PAT token"
+        echo -e "3. ${BLUE}SETTINGSBRANCH${NC} - Github branch (default: main)"
+        echo -e "4. ${GREEN}Back${NC}\n"
+        
+        read -p "Select option (1-4) [default: 4]: " option
+        option=${option:-4}
+        
+        case $option in
+            1)
+                configure_setting "SETTINGSURL" \
+                    "https://github.com/Oksii/legacy-configs.git" \
+                    "Github repository URL" \
+                    "Repository" "true"
+                ;;
+            2)
+                configure_setting "SETTINGSPAT" "" \
+                    "Github PAT token" \
+                    "Repository" "true"
+                ;;
+            3)
+                configure_setting "SETTINGSBRANCH" "main" \
+                    "Github branch name" \
+                    "Repository" "true"
+                ;;
+            4) return 0 ;;
+            *) log "warning" "Invalid option" ; sleep 1 ;;
+        esac
+    done
+}
+
 
 setup_stats_variables() {
     show_header
     log "prompt" "Stats Configuration"
     echo -e "${YELLOW}Enable stats tracking to collect match data and player statistics.${NC}\n"
+    echo -e "${YELLOW}Stats will automatically be submitted to https://stats.etl.lol on every round end.${NC}\n"
     
     read -p "Would you like to enable stats submission? (Y/n): " ENABLE_STATS
     if [[ ! $ENABLE_STATS =~ ^[Nn]$ ]]; then
-        add_setting "Stats Configuration" "STATS_SUBMIT" "true"
-        add_setting "Stats Configuration" "STATS_API_TOKEN" "GameStatsWebLuaToken"
-        add_setting "Stats Configuration" "STATS_API_URL_SUBMIT" "https://api.etl.lol/api/v2/stats/etl/matches/stats/submit"
-        add_setting "Stats Configuration" "STATS_API_URL_MATCHID" "https://api.etl.lol/api/v2/stats/etl/match-manager"
-        add_setting "Stats Configuration" "STATS_API_PATH" "/legacy/homepath/legacy/stats"
-        add_setting "Stats Configuration" "STATS_API_LOG" "false"
-        add_setting "Stats Configuration" "STATS_API_OBITUARIES" "false"
-        add_setting "Stats Configuration" "STATS_API_DAMAGESTAT" "false"
-        add_setting "Stats Configuration" "STATS_API_MESSAGELOG" "false"
-        add_setting "Stats Configuration" "STATS_API_DUMPJSON" "false"
+        store_setting "Stats Configuration" "STATS_SUBMIT" "true"
+        store_setting "Stats Configuration" "STATS_API_TOKEN" "GameStatsWebLuaToken"
+        store_setting "Stats Configuration" "STATS_API_URL_SUBMIT" "https://api.etl.lol/api/v2/stats/etl/matches/stats/submit"
+        store_setting "Stats Configuration" "STATS_API_URL_MATCHID" "https://api.etl.lol/api/v2/stats/etl/match-manager"
+        store_setting "Stats Configuration" "STATS_API_PATH" "/legacy/homepath/legacy/stats"
+        store_setting "Stats Configuration" "STATS_API_LOG" "false"
+        store_setting "Stats Configuration" "STATS_API_OBITUARIES" "false"
+        store_setting "Stats Configuration" "STATS_API_DAMAGESTAT" "false"
+        store_setting "Stats Configuration" "STATS_API_MESSAGELOG" "false"
+        store_setting "Stats Configuration" "STATS_API_DUMPJSON" "false"
     else
-        add_setting "Stats Configuration" "STATS_SUBMIT" "false"
+        store_setting "Stats Configuration" "STATS_SUBMIT" "false"
     fi
-        log "success" "Stats collection enabled and configured!"
+
+    log "success" "Stats collection enabled and configured!"
     sleep 1
 }
-
 
 configure_watchtower() {
     show_header
@@ -1300,7 +1328,7 @@ configure_watchtower() {
         log "info" "Watchtower will not be enabled"
     fi
     
-    sleep 2
+    sleep 1
     return 0
 }
 
@@ -1347,17 +1375,30 @@ configure_auto_restart() {
     return 0
 }
 
+# Map all instance settings to docker-compose environment
+map_instance_settings() {
+    local instance=$1
+    
+    # Get all settings for this instance from settings.env
+    grep "^SERVER${instance}_" "$SETTINGS_FILE" | while IFS='=' read -r key value; do
+        # Extract the setting name without the SERVER{instance}_ prefix
+        local setting=${key#SERVER${instance}_}
+        
+        # Add to environment section
+        sed -i "/^  etl-server$instance:/,/^[^ ]/ {
+            /environment:/a\      ${setting}: \${$key}
+        }" docker-compose.yml
+    done
+}
 
-# Generate individual server service configurations
 generate_service() {
     local instance=$1
-    local default_port=$((27960 + instance - 1))
+    local default_port=$((27960 + (instance - 1) * 10))
     
     show_header
     log "prompt" "Server $instance Configuration"
     
-    echo -e "${YELLOW}Configure ETL Server $instance${NC}\n"
-    
+    # Get required settings from user
     local port
     while true; do
         read -p "Server Port [default: $default_port]: " port
@@ -1370,8 +1411,10 @@ generate_service() {
         break
     done
     
-    read -p "Server Name [default: ^7ETL Server $instance]: " hostname
-    hostname=${hostname:-"^7ETL Server $instance"}
+    # Get hostname with default
+    local default_hostname="ETL-Server $instance"
+    read -p "Server Name [default: $default_hostname]: " hostname
+    hostname=${hostname:-"$default_hostname"}
     
     echo -e "\n${BLUE}Security Settings${NC}"
     read -p "Server Password [default: empty]: " password
@@ -1379,43 +1422,29 @@ generate_service() {
     read -p "Referee Password [default: empty]: " referee
     read -p "Shoutcaster Password [default: empty]: " sc
 
-    {
-        echo "# ETL Server \"$hostname\""
-        echo "SERVER${instance}_HOSTNAME=$hostname"
-        echo "SERVER${instance}_PORT=$port"
-        [ ! -z "$password" ] && echo "SERVER${instance}_PASSWORD=$password"
-        [ ! -z "$rcon" ] && echo "SERVER${instance}_RCONPASSWORD=$rcon"
-        [ ! -z "$referee" ] && echo "SERVER${instance}_REFEREEPASSWORD=$referee"
-        [ ! -z "$sc" ] && echo "SERVER${instance}_SCPASSWORD=$sc"
-        echo ""
-    } >> "$SETTINGS_FILE"
+    # Store all settings in settings.env
+    store_server_setting "$instance" "MAP_PORT" "$port"
+    store_server_setting "$instance" "HOSTNAME" "$hostname"
     
+    # Store optional passwords only if they're not empreorganize_settings_filety
+    [ -n "$password" ] && store_server_setting "$instance" "PASSWORD" "$password"
+    [ -n "$rcon" ] && store_server_setting "$instance" "RCONPASSWORD" "$rcon"
+    [ -n "$referee" ] && store_server_setting "$instance" "REFEREEPASSWORD" "$referee"
+    [ -n "$sc" ] && store_server_setting "$instance" "SCPASSWORD" "$sc"
+
+    # Generate only the basic service structure without environment variables
     cat >> docker-compose.yml << EOL
 
   etl-server$instance:
     <<: *common-core
     container_name: etl-server$instance
     environment:
-      MAP_PORT: \${SERVER${instance}_PORT}
-      HOSTNAME: \${SERVER${instance}_HOSTNAME}
-EOL
-
-    [ ! -z "$password" ] && echo "      PASSWORD: \${SERVER${instance}_PASSWORD}" >> docker-compose.yml
-    [ ! -z "$rcon" ] && echo "      RCONPASSWORD: \${SERVER${instance}_RCONPASSWORD}" >> docker-compose.yml
-    [ ! -z "$referee" ] && echo "      REFEREEPASSWORD: \${SERVER${instance}_REFEREEPASSWORD}" >> docker-compose.yml
-    [ ! -z "$sc" ] && echo "      SCPASSWORD: \${SERVER${instance}_SCPASSWORD}" >> docker-compose.yml
-
-    cat >> docker-compose.yml << EOL
     volumes:
       - "\${MAPSDIR}/etmain:/maps"
       - "\${LOGS}/etl-server$instance:/legacy/homepath/legacy/"
     ports:
-      - '\${SERVER${instance}_PORT}:\${SERVER${instance}_PORT}/udp'
+      - '\${SERVER${instance}_MAP_PORT}:\${SERVER${instance}_MAP_PORT}/udp'
 EOL
-
-    setup_directory "$INSTALL_DIR/logs/etl-server$instance" "$SELECTED_USER" || return 1
-    log "success" "Server $instance configuration complete"
-    sleep 1
 }
 
 generate_docker_compose() {
@@ -1459,6 +1488,8 @@ EOL
             log "error" "Failed to configure server $i"
             exit 1
         }
+        map_instance_settings "$i"
+        
         log "success" "Server $i configuration complete!"
     done
 
@@ -1480,17 +1511,17 @@ EOL
 
 setup_volume_paths() {
     local install_dir="$1"
-    add_setting "Volumes" "MAPSDIR" "$install_dir/maps"
-    add_setting "Volumes" "LOGS" "$install_dir/logs"
+    store_setting "Volumes" "MAPSDIR" "$install_dir/maps"
+    store_setting "Volumes" "LOGS" "$install_dir/logs"
 }
 
 create_helper_script() {
     local install_dir="$1"
     local instances="$2"
-    
+
     show_header
     log "prompt" "Creating Server Management Script"
-    
+
     # Detect which docker compose command to use
     local compose_cmd
     compose_cmd=$(detect_docker_compose_command) || {
@@ -1498,65 +1529,147 @@ create_helper_script() {
         return 1
     }
     log "info" "Using Docker Compose command: $compose_cmd"
-    
-    cat > "$install_dir/server" << EOL
-#!/bin/bash
-INSTALL_DIR="$install_dir"
-SETTINGS_FILE="\$INSTALL_DIR/settings.env"
-COMPOSE_CMD="$compose_cmd"
-cd "\$INSTALL_DIR" || exit 1
 
+    cat > "$install_dir/etl-server" << EOL
+#!/bin/bash
+INSTALL_DIR="${install_dir}"
+SETTINGS_FILE="${install_dir}/settings.env"
+COMPOSE_CMD="${compose_cmd}"
+cd "$INSTALL_DIR" || exit 1
+EOL
+    cat >> "$install_dir/etl-server" << 'EOL'
 usage() {
     echo "ETLegacy Server Management Script"
     echo "================================"
-    echo "Usage: \$0 [start|stop|restart] [instance_number]"
+    echo "Usage: $0 [start|stop|restart|status] [instance_number]"
     echo
     echo "Commands:"
     echo "  start    Start servers"
     echo "  stop     Stop servers"
     echo "  restart  Restart servers"
+    echo "  status   Show server status"
     echo
     echo "Examples:"
-    echo "  \$0 start     # Starts all servers"
-    echo "  \$0 stop 2    # Stops server instance 2"
-    echo "  \$0 restart 1 # Restarts server instance 1"
+    echo "  etl-server start     # Starts all servers"
+    echo "  etl-server stop 2    # Stops server instance 2"
+    echo "  etl-server restart 1 # Restarts server instance 1"
+    echo "  etl-server status    # Shows status of all servers"
+    echo "  etl-server status 2  # Shows status of server 2"
     exit 1
 }
 
-if [ \$# -lt 1 ]; then
+# Format duration from seconds to human readable
+format_duration() {
+    local seconds=$1
+    local days=$((seconds/86400))
+    local hours=$(((seconds%86400)/3600))
+    local minutes=$(((seconds%3600)/60))
+    
+    if [ $days -gt 0 ]; then
+        echo "${days}d ${hours}h ${minutes}m"
+    elif [ $hours -gt 0 ]; then
+        echo "${hours}h ${minutes}m"
+    else
+        echo "${minutes}m"
+    fi
+}
+
+get_container_status() {
+    local container="$1"
+    local state running_for status
+    
+    # Get container state (running/stopped)
+    state=$(docker inspect --format='{{.State.Status}}' "$container" 2>/dev/null)
+    if [ -z "$state" ]; then
+        echo "Container not found"
+        return 1
+    fi
+
+    # Get uptime if running
+    if [ "$state" = "running" ]; then
+        running_for=$(docker inspect --format='{{.State.StartedAt}}' "$container" | xargs -I{} date -d {} +%s)
+        now=$(date +%s)
+        uptime=$((now - running_for))
+        status="$state (up $(format_duration $uptime))"
+    else
+        status="$state"
+    fi
+
+    # Get environment variables using grep
+    local hostname port password rconpass refpass
+    hostname=$(docker inspect "$container" | grep -Po '"HOSTNAME=\K[^"]*' || echo "-")
+    port=$(docker inspect "$container" | grep -Po '"MAP_PORT=\K[^"]*' || echo "-")
+    password=$(docker inspect "$container" | grep -Po '"PASSWORD=\K[^"]*' || echo "-")
+    rconpass=$(docker inspect "$container" | grep -Po '"RCONPASSWORD=\K[^"]*' || echo "-")
+    refpass=$(docker inspect "$container" | grep -Po '"REFEREEPASSWORD=\K[^"]*' || echo "-")
+
+    # Print status with fixed width columns
+    printf "%-12s %-18s %-15s %-8s %-10s %-12s %-12s\n" \
+           "$container" \
+           "$status" \
+           "$hostname" \
+           "$port" \
+           "$password" \
+           "$rconpass" \
+           "$refpass"
+}
+
+# Show status of containers
+show_status() {
+    local instance="$1"
+    
+    echo "ETLegacy Server Status"
+    echo "===================="
+    printf "%-12s %-18s %-15s %-8s %-10s %-12s %-12s\n" \
+           "CONTAINER" "STATUS" "HOSTNAME" "PORT" "PASSWORD" "RCONPASS" "REFPASS"
+    echo "------------------------------------------------------------------------------"
+    
+    if [ -n "$instance" ]; then
+        get_container_status "etl-server$instance"
+    else
+        for container in $(docker ps -a --filter "name=etl-server" --format "{{.Names}}" | sort); do
+            get_container_status "$container"
+        done
+    fi
+}
+
+if [ $# -lt 1 ]; then
     usage
 fi
 
-ACTION=\$1
-INSTANCE=\$2
+ACTION=$1
+INSTANCE=$2
 
-case \$ACTION in
+case $ACTION in
     start)
-        if [ -z "\$INSTANCE" ]; then
+        if [ -z "$INSTANCE" ]; then
             echo "Starting all servers..."
-            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE up -d
+            $COMPOSE_CMD --env-file=$SETTINGS_FILE up -d
         else
-            echo "Starting server \$INSTANCE..."
-            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE up -d etl-server\$INSTANCE
+            echo "Starting server $INSTANCE..."
+            $COMPOSE_CMD --env-file=$SETTINGS_FILE up -d etl-server$INSTANCE
         fi
         ;;
     stop)
-        if [ -z "\$INSTANCE" ]; then
+        if [ -z "$INSTANCE" ]; then
             echo "Stopping all servers..."
-            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE down
+            $COMPOSE_CMD --env-file=$SETTINGS_FILE down
         else
-            echo "Stopping server \$INSTANCE..."
-            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE stop etl-server\$INSTANCE
+            echo "Stopping server $INSTANCE..."
+            $COMPOSE_CMD --env-file=$SETTINGS_FILE stop etl-server$INSTANCE
         fi
         ;;
     restart)
-        if [ -z "\$INSTANCE" ]; then
+        if [ -z "$INSTANCE" ]; then
             echo "Restarting all servers..."
-            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE restart
+            $COMPOSE_CMD --env-file=$SETTINGS_FILE restart
         else
-            echo "Restarting server \$INSTANCE..."
-            \$COMPOSE_CMD --env-file=\$SETTINGS_FILE restart etl-server\$INSTANCE
+            echo "Restarting server $INSTANCE..."
+            $COMPOSE_CMD --env-file=$SETTINGS_FILE restart etl-server$INSTANCE
         fi
+        ;;
+    status)
+        show_status "$INSTANCE"
         ;;
     *)
         usage
@@ -1564,9 +1677,9 @@ case \$ACTION in
 esac
 EOL
 
-    chmod +x "$install_dir/server"
-    chown "$SELECTED_USER:$SELECTED_USER" "$install_dir/server"
-    ln -sf "$install_dir/server" /usr/local/bin/etl-server
+    chmod +x "$install_dir/etl-server"
+    chown "$SELECTED_USER:$SELECTED_USER" "$install_dir/etl-server"
+    ln -sf "$install_dir/etl-server" /usr/local/bin/etl-server
     
     log "success" "Server management script created!"
     sleep 2
@@ -1597,7 +1710,7 @@ configure_webserver() {
         echo -e "\n${YELLOW}Your webserver will be available at:${NC} http://$public_ip"
         
         local redirect_url="http://$public_ip"
-        add_setting "Additional Settings" "REDIRECTURL" "$redirect_url"
+        store_setting "Additional Settings" "REDIRECTURL" "$redirect_url"
         
         # Create legacy folder for maps
         setup_directory "$INSTALL_DIR/maps/legacy" "$SELECTED_USER" || return 1
@@ -1627,51 +1740,6 @@ add_webserver_service() {
       - "\${MAPSDIR}:/data"
     restart: unless-stopped
 EOL
-}
-
-review_settings() {
-    show_header
-    log "prompt" "Configuration Review"
-    
-    echo -e "${BLUE}Installation Directory:${NC} $INSTALL_DIR"
-    echo -e "${BLUE}Number of Instances:${NC} $INSTANCES\n"
-
-    display_section() {
-        local section=$1
-        local content
-        
-        echo -e "\n${YELLOW}# $section${NC}"
-        content=$(sed -n "/^# $section$/,/^#/p" "$SETTINGS_FILE" | grep "^[A-Z]" || true)
-        if [ ! -z "$content" ]; then
-            echo -e "$content" | sort
-        fi
-    }
-    
-    display_section "Volumes"
-    display_section "Map Settings"
-    display_section "Stats Configuration"
-    display_section "Additional Settings"
-    
-    echo -e "\n${YELLOW}# Server Configurations${NC}"
-    for i in $(seq 1 $INSTANCES); do
-        # Find and display each server's configuration
-        if grep -q "^# ETL Server \".*\"$" "$SETTINGS_FILE"; then
-            server_name=$(sed -n "/^# ETL Server \".*\"$/,/^#/p" "$SETTINGS_FILE" | grep "SERVER${i}_HOSTNAME" | cut -d'=' -f2- || true)
-            if [ ! -z "$server_name" ]; then
-                echo -e "\n${BLUE}# ETL Server \"$server_name\"${NC}"
-                sed -n "/^# ETL Server \".*\"$/,/^#/p" "$SETTINGS_FILE" | grep "^SERVER${i}_" | sort || true
-            fi
-        fi
-    done
-    
-    # Show Docker configuration with proper escaping of $ signs
-    echo -e "\n${BLUE}Docker Compose Configuration:${NC}"
-    echo -e "${YELLOW}"
-    sed 's/\$/\\\$/g' docker-compose.yml || true
-    echo -e "${NC}"
-    
-    echo
-    read -p "Press Enter to continue with these settings, or Ctrl+C to abort..."
 }
 
 post_deployment_tasks() {
@@ -1724,40 +1792,16 @@ main() {
     # Initial checks
     check_system || exit 1
     check_root || exit 1
-    check_resources
     install_requirements || exit 1
     setup_user || exit 1
-    
-    if [ -z "$SELECTED_USER" ]; then
-        log "error" "No user was selected during setup"
-        exit 1
-    fi
-
-    setup_installation_directory "$SELECTED_USER" || {
-        log "error" "Failed to setup installation directory"
-        exit 1
-    }
-    
-    if [ -z "$INSTALL_DIR" ]; then
-        log "error" "Installation directory was not set"
-        exit 1
-    fi
+    setup_installation_directory "$SELECTED_USER" || exit 1
 
     # Set up settings file path
     export SETTINGS_FILE="$INSTALL_DIR/settings.env"
-
-    # Initialize settings file
-    initialize_settings_file "$INSTALL_DIR" "$CURRENT_USER" || {
-        log "error" "Failed to initialize settings file"
-        exit 1
-    }
+    init_settings_manager "$INSTALL_DIR" "$SELECTED_USER"
 
     install_docker || exit 1
-    
-    cd "$INSTALL_DIR" || {
-        log "error" "Failed to change to installation directory"
-        exit 1
-    }
+    cd "$INSTALL_DIR" || exit 1
 
     # Detect docker compose command
     local compose_cmd
@@ -1767,22 +1811,20 @@ main() {
     }
     export DOCKER_COMPOSE_CMD="$compose_cmd"
 
-    configure_server_instances
+    setup_volume_paths "$INSTALL_DIR"
     setup_maps "$INSTALL_DIR"
     setup_map_environment
     setup_stats_variables
-    configure_additional_variables "$INSTANCES"
-    setup_volume_paths "$INSTALL_DIR"
-    configure_watchtower
+    configure_server_instances
+    configure_server_settings "$INSTANCES"
     configure_auto_restart || true 
+    configure_watchtower
     configure_webserver
 
     generate_docker_compose "$INSTALL_DIR" "$INSTANCES" "$USE_WATCHTOWER" "$USE_WEBSERVER"
+    reorganize_settings_file
 
-    read -p "Would you like to review your settings? (Y/n): " REVIEW
-    if [[ ! $REVIEW =~ ^[Nn]$ ]]; then
-        review_settings
-    fi
+    review_settings
 
     setup_directory "$INSTALL_DIR/logs" "$SELECTED_USER" || exit 1
     for i in $(seq 1 $INSTANCES); do
@@ -1791,7 +1833,6 @@ main() {
     chmod -R 777 "$INSTALL_DIR/logs"
 
     create_helper_script "$INSTALL_DIR" "$INSTANCES"
-
     chown -R "$SELECTED_USER:$SELECTED_USER" "$INSTALL_DIR"
 
     show_header
@@ -1821,22 +1862,27 @@ main() {
         log "info" "3. Run 'etl-server restart' to ensure proper permissions"
     fi
 
-    log "info" "Use 'etl-server start|stop|restart [instance_number]' to manage your servers"
+    log "info" "Use 'etl-server start|stop|restart|status [instance_number]' to manage your servers"
+    log "info" "Or simply 'etl-server' to display the help message"
     log ""
     log "info" "Make sure to forward the necessary ports for your servers:" 
 
     # Get server ports from settings file
     log "info" "ETL-Server PORTS (UDP):"
     for i in $(seq 1 $INSTANCES); do
-        port=$(grep "SERVER${i}_PORT=" "$SETTINGS_FILE" | cut -d'=' -f2)
-        echo -e "  - $port"
+        port=$(grep "SERVER${i}_MAP_PORT=" "$SETTINGS_FILE" | cut -d'=' -f2)
+        if [ ! -z "$port" ]; then
+            echo -e "  - $port"
+        fi
     done
 
-    # Only show webserver port if it was enabled
+    # Only show webserver URL if it was enabled
     if grep -q "^REDIRECTURL=" "$SETTINGS_FILE"; then
-        log "info" "Webserver PORT (TCP):"
-        echo -e "  - 80"
+        redirect_url=$(grep "^REDIRECTURL=" "$SETTINGS_FILE" | cut -d'=' -f2)
+        log "info" "Webserver URL:"
+        echo -e "  - $redirect_url"
     fi
+
 }
 
 main
