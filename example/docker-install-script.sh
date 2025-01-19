@@ -74,7 +74,7 @@ else
 fi
 
 SETTINGS_FILE="settings.env"
-DEFAULT_MAPS="adlernest braundorf_b4 bremen_b3 decay_sw erdenberg_t2 et_brewdog_b6 et_ice et_operation_b7 etl_adlernest_v4 etl_frostbite_v17 etl_ice_v12 etl_sp_delivery_v5 frostbite karsiah_te2 missile_b3 supply_sp sw_goldrush_te te_escape2_fixed3 te_valhalla"
+DEFAULT_MAPS="adlernest braundorf_b4 bremen_b3 decay_sw erdenberg_t2 et_brewdog_b6 et_ice et_operation_b7 etl_adlernest_v4 etl_frostbite_v17 etl_ice_v12 etl_sp_delivery_v5 frostbite karsiah_te2 missile_b3 supply_sp sw_goldrush_te te_escape2_fixed3 te_valhalla reactor_final"
 
 DEBUG=${DEBUG:-0}
 
@@ -981,7 +981,6 @@ configure_server_instances() {
     
     export INSTANCES
 }
-
 setup_maps() {
     local install_dir="$1"
     local maps_txt="$install_dir/maps.txt"
@@ -1023,24 +1022,31 @@ setup_maps() {
     print_section_header "Map Repository Selection" "(These settings can be changed later)"
     log "prompt" "Select a server to download from"
     log "" "  1. dl.etl.lol (comp maps only)"
-    log "" "  2. download.hirntot.org (Alternative)"
-    log "" "  3. Custom repository URL$"
+    log "" "  2. download.hirntot.org (huge variety)"
+    log "" "  3. moestavern.site.nfoservers.com/downloads/et (moe)"
+    log "" "  4. Custom repository URL"
     echo
     echo
-    read -p "Select repository [default: 1] (1-3): " REPO_CHOICE
+    read -p "Select repository [default: 1] (1-4): " REPO_CHOICE
     
     case $REPO_CHOICE in
-        1) repo_url="https://dl.etl.lol/maps/et/etmain" ;;
-        2) repo_url="https://download.hirntot.org/etmain" ;;
-        3) 
+        1) repo_url="https://dl.etl.lol/maps/et" ;;
+        2) repo_url="https://download.hirntot.org" ;;
+        3) repo_url="http://moestavern.site.nfoservers.com/downloads/et" ;;
+        4) 
             echo -e "\n${YELLOW}Enter custom repository URL:${NC}"
             read -p "> " repo_url
+            # Remove trailing /etmain if present
+            repo_url="${repo_url%/etmain}"
             ;;
         *) 
             log "warning" "Invalid choice. Using default repository."
-            repo_url="https://dl.etl.lol/maps/et/etmain"
+            repo_url="https://dl.etl.lol/maps/et"
             ;;
     esac
+    
+    # Store the repository URL in settings
+    store_setting "Additional Settings" "REDIRECTURL" "${repo_url}"
     
     show_header
     print_section_header "Map Selection" "(These settings can be changed later)"
@@ -1100,11 +1106,28 @@ setup_maps() {
     # Use a temporary file for download progress
     local progress_file=$(mktemp)
 
+    # First attempt - try with /etmain path
     parallel --eta --jobs 30 --progress \
-        "wget -q -P \"$install_dir/maps/etmain\" \"$repo_url/{}\" 2>/dev/null || 
+        "wget -q -P \"$install_dir/maps/etmain\" \"$repo_url/etmain/{}\" 2>/dev/null || 
         echo {} >> \"$failed_maps\"; 
         echo \"Downloaded: {}\" >> \"$progress_file\"" \
         :::: "$maps_txt"
+
+    # Second attempt for failed downloads - try without /etmain path
+    if [ -s "$failed_maps" ]; then
+        log "info" "Retrying failed downloads without /etmain path..."
+        local retry_maps=$(mktemp)
+        cp "$failed_maps" "$retry_maps"
+        > "$failed_maps"  # Clear failed_maps for second attempt
+
+        parallel --eta --jobs 30 --progress \
+            "wget -q -P \"$install_dir/maps/etmain\" \"$repo_url/{}\" 2>/dev/null || 
+            echo {} >> \"$failed_maps\"; 
+            echo \"Downloaded: {}\" >> \"$progress_file\"" \
+            :::: "$retry_maps"
+            
+        rm -f "$retry_maps"
+    fi
 
     # Display download results
     if [ -f "$progress_file" ]; then
@@ -1245,7 +1268,7 @@ configure_server_settings() {
             1) configure_setting "STARTMAP" "radar" "Map server starts on" "Server Settings" ;;
             2) configure_setting "MAXCLIENTS" "32" "Maximum number of players" "Server Settings" ;;
             3) configure_setting "AUTO_UPDATE" "true" "Update configurations on restart" "Server Settings" "true" ;;
-            4) configure_setting "CONF_MOTD" "" "Message of the day shown on connect" "Server Settings" ;;
+            4) configure_motd ;;
             5) configure_setting "SERVERCONF" "legacy6" "Configuration to load on startup" "Server Settings" ;;
             6) configure_setting "TIMEOUTLIMIT" "1" "Maximum number of pauses per map side" "Server Settings" ;;
             7) configure_etltv_menu ;;
@@ -1286,6 +1309,172 @@ configure_advanced_settings() {
             6) configure_setting "ADDITIONAL_CLI_ARGS" "" "Additional command line arguments" "CLI Settings" "true" ;;
             7) return 0 ;;
             *) log "warning" "Invalid option" ; sleep 1 ;;
+        esac
+    done
+}
+
+# Function to convert Q3 color codes to ANSI escape sequences
+q3_to_ansi() {
+    local text="$1"
+    local colored_text="$text"
+    
+    # Complete color mappings with all variants
+    declare -A color_map=(
+        ['^0']=$'\e[30m' ['^P']=$'\e[30m' ['^p']=$'\e[30m'                   # Black (#000000)
+        ['^1']=$'\e[31m' ['^Q']=$'\e[31m' ['^q']=$'\e[31m'                   # Red (#ff0000)
+        ['^2']=$'\e[32m' ['^R']=$'\e[32m' ['^r']=$'\e[32m'                   # Green (#00ff00)
+        ['^3']=$'\e[33m' ['^S']=$'\e[33m' ['^s']=$'\e[33m'                   # Yellow (#ffff00)
+        ['^4']=$'\e[34m' ['^T']=$'\e[34m' ['^t']=$'\e[34m'                   # Blue (#0000ff)
+        ['^5']=$'\e[36m' ['^U']=$'\e[36m' ['^u']=$'\e[36m'                   # Cyan (#00ffff)
+        ['^6']=$'\e[35m' ['^V']=$'\e[35m' ['^v']=$'\e[35m'                   # Magenta (#ff00ff)
+        ['^7']=$'\e[37m' ['^W']=$'\e[37m' ['^w']=$'\e[37m'                   # White (#ffffff)
+        ['^8']=$'\e[38;5;214m' ['^X']=$'\e[38;5;214m' ['^x']=$'\e[38;5;214m' # Orange (#ff7f00)
+        ['^9']=$'\e[90m' ['^Y']=$'\e[90m' ['^y']=$'\e[90m'                   # Grey (#7f7f7f)
+        ['^:']=$'\e[37;1m' ['^Z']=$'\e[37;1m' ['^z']=$'\e[37;1m'             # Bright Grey (#bfbfbf)
+        ['^;']=$'\e[37;1m' ['^[']=$'\e[37;1m' ['^{']=$'\e[37;1m'             # Bright Grey (#bfbfbf)
+        ['^<']=$'\e[38;5;22m' ['^\\']=$'\e[38;5;22m' ['^|']=$'\e[38;5;22m'   # Dark Green (#007f00)
+        ['^=']=$'\e[38;5;142m' ['^]']=$'\e[38;5;142m' ['^}']=$'\e[38;5;142m' # Olive (#7f7f00)
+        ['^>']=$'\e[38;5;18m' ['^^']=$'\e[38;5;18m' ['^~']=$'\e[38;5;18m'    # Dark Blue (#00007f)
+        ['^?']=$'\e[38;5;52m' ['^_']=$'\e[38;5;52m'                          # Dark Red (#7f0000)
+        ['^@']=$'\e[38;5;94m' ['^`']=$'\e[38;5;94m'                          # Brown (#7f3f00)
+        ['^!']=$'\e[38;5;214m' ['^A']=$'\e[38;5;214m' ['^a']=$'\e[38;5;214m' # Gold (#ff9919)
+        ['^"']=$'\e[38;5;30m' ['^B']=$'\e[38;5;30m' ['^b']=$'\e[38;5;30m'    # Teal (#007f7f)
+        ['^#']=$'\e[38;5;90m' ['^C']=$'\e[38;5;90m' ['^c']=$'\e[38;5;90m'    # Purple (#7f007f)
+        ['^$']=$'\e[38;5;33m' ['^D']=$'\e[38;5;33m' ['^d']=$'\e[38;5;33m'    # Light Blue (#007fff)
+        ['^%']=$'\e[38;5;93m' ['^E']=$'\e[38;5;93m' ['^e']=$'\e[38;5;93m'    # Violet (#7f00ff)
+        ['^&']=$'\e[38;5;74m' ['^F']=$'\e[38;5;74m' ['^f']=$'\e[38;5;74m'    # Steel Blue (#3399cc)
+        ["^'"]=$'\e[38;5;157m' ['^G']=$'\e[38;5;157m' ['^g']=$'\e[38;5;157m' # Light Green (#ccffcc)
+        ['^(']=$'\e[38;5;22m' ['^H']=$'\e[38;5;22m' ['^h']=$'\e[38;5;22m'    # Dark Green (#006633)
+        ['^)']=$'\e[38;5;196m' ['^I']=$'\e[38;5;196m' ['^i']=$'\e[38;5;196m' # Bright Red (#ff0033)
+        ['^*']=$'\e[38;5;124m' ['^J']=$'\e[38;5;124m' ['^j']=$'\e[38;5;124m' # Dark Red (#b21919)
+        ['^+']=$'\e[38;5;130m' ['^K']=$'\e[38;5;130m' ['^k']=$'\e[38;5;130m' # Brown (#993300)
+        ['^,']=$'\e[38;5;172m' ['^L']=$'\e[38;5;172m' ['^l']=$'\e[38;5;172m' # Gold Brown (#cc9933)
+        ['^-']=$'\e[38;5;143m' ['^M']=$'\e[38;5;143m' ['^m']=$'\e[38;5;143m' # Olive (#999933)
+        ['^.']=$'\e[38;5;229m' ['^N']=$'\e[38;5;229m' ['^n']=$'\e[38;5;229m' # Light Yellow (#ffffbf)
+        ['^/']=$'\e[38;5;227m' ['^O']=$'\e[38;5;227m' ['^o']=$'\e[38;5;227m' # Pale Yellow (#ffff7f)
+    )
+    
+    # Replace each color code with its ANSI equivalent
+    for code in "${!color_map[@]}"; do
+        colored_text="${colored_text//$code/${color_map[$code]}}"
+    done
+    
+    # Add reset code at the end
+    colored_text="${colored_text}$'\e[0m'"
+    
+    echo -e "$colored_text"
+}
+
+# Function to preview MOTD lines
+preview_motd() {
+    local motd="$1"
+    
+    echo -e "\n${CYAN}Preview of current MOTD:${NC}"
+    echo -e "${YELLOW}----------------------------------------${NC}"
+    # Replace \n with actual newlines and convert color codes
+    echo -e "$motd" | sed 's/\\n/\n/g' | while IFS= read -r line; do
+        q3_to_ansi "$line"
+    done
+    echo -e "${YELLOW}----------------------------------------${NC}\n"
+}
+
+# Function to handle MOTD configuration
+configure_motd() {
+    local current_motd=""
+    local motd_lines=()
+    
+    # Get current MOTD from settings if it exists
+    current_motd=$(get_setting "Server Settings" "CONF_MOTD") || current_motd=""
+    
+    # If we have an existing MOTD, split it into lines
+    if [[ -n "$current_motd" ]]; then
+        IFS=$'\n' read -d '' -r -a motd_lines <<< "$(echo -e "${current_motd//\\n/$'\n'}")"
+    else
+        # Default MOTD lines
+        motd_lines=(
+            "^7**************************"
+            "^7* ^3Welcome to ^2ET^5Legacy ^7*"
+            "^7* ^6Server running on    ^7*"
+            "^7* ^4ETLegacy ^1Docker    ^7*"
+            "^7* ^2Enjoy your stay^7!    ^7*"
+            "^7**************************"
+        )
+        current_motd=$(printf "%s\\n" "${motd_lines[@]}")
+        current_motd=${current_motd%$'\n'} # Remove trailing newline
+    fi
+
+    while true; do
+        show_header
+        print_section_header "Message of the Day Configuration"
+        preview_motd "$current_motd"
+        
+        echo -e "${BLUE}     1. server_motd0            ${NC}- First line"
+        echo -e "${BLUE}     2. server_motd1            ${NC}- Second line"
+        echo -e "${BLUE}     3. server_motd2            ${NC}- Third line"
+        echo -e "${BLUE}     4. server_motd3            ${NC}- Fourth line"
+        echo -e "${BLUE}     5. server_motd4            ${NC}- Fifth line"
+        echo -e "${BLUE}     6. server_motd5            ${NC}- Sixth line"
+        echo -e "${BLUE}     7. Enter full string       ${NC}- Set entire MOTD at once"
+        log "success" "  8. Save and Exit"
+        echo
+        
+        read -p "Select option (1-8) [default: 8]: " option
+        option=${option:-8}
+
+        case $option in
+            [1-6])
+                local line_index=$((option - 1))
+                echo
+                log "prompt" "Enter text for line $option (current: ${motd_lines[$line_index]:-empty})"
+                read -p "> " new_line
+                if [[ -n "$new_line" ]]; then
+                    motd_lines[$line_index]="$new_line"
+                    current_motd=$(printf "%s\\n" "${motd_lines[@]}")
+                    current_motd=${current_motd%$'\n'} # Remove trailing newline
+                fi
+                ;;
+            7)
+                echo
+                log "prompt" "Enter complete MOTD string (use \\n for line breaks):"
+                log "info" "Example: ^7Line1\\n^7Line2\\n^7Line3"
+                echo
+                read -r full_motd
+                if [[ -n "$full_motd" ]]; then
+                    current_motd="$full_motd"
+                    # Use printf to properly handle the newlines
+                    mapfile -t motd_lines < <(printf '%s' "$full_motd" | sed 's/\\n/\n/g')
+                fi
+                ;;
+            8)
+                # If multiple instances are configured, handle per-server settings
+                if [ "$INSTANCES" -gt 1 ]; then
+                    log "info" "Apply this setting:"
+                    log "prompt" "1. Globally (all instances)"
+                    log "prompt" "2. Per-server (specific instances)"
+                    
+                    read -p "Choose option (1/2) [default: 1]: " scope
+                    scope=${scope:-1}
+                    
+                    if [ "$scope" = "2" ]; then
+                        for i in $(seq 1 $INSTANCES); do
+                            log "prompt" "Apply to Server $i? (Y/n)"
+                            read -p "> " apply
+                            if [[ ! $apply =~ ^[Nn]$ ]]; then
+                                store_server_setting "$i" "CONF_MOTD" "$current_motd"
+                            fi
+                        done
+                    else
+                        store_setting "Server Settings" "CONF_MOTD" "$current_motd" "true"
+                    fi
+                else
+                    store_setting "Server Settings" "CONF_MOTD" "$current_motd" "false"
+                fi
+                return 0
+                ;;
+            *)
+                log "warning" "Invalid option"
+                sleep 1
+                ;;
         esac
     done
 }
@@ -2096,6 +2285,12 @@ main() {
     log "prompt" "To view server logs see $INSTALL_DIR/logs"
     log "prompt" "Alternatively: follow docker's logs via 'etl-server logs [instance_number]'"
     echo
+
+    print_section_header "Uninstall/Re-install" 
+    log "prompt" "If you wish to re-install or uninstall you can follow the instructions below"
+    log "warning" "This will erase all your configuration settings."
+    log "" "  etl-server stop && rm rf $INSTALL_DIR"
+    echo  
 
     print_section_header "Network Configuration"
     log "warning" "Firewall Configuration:"
