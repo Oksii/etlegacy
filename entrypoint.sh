@@ -37,6 +37,7 @@ declare -A CONF=(
     [TIMEOUTLIMIT]="${TIMEOUTLIMIT:-1}"
     [SERVERCONF]="${SERVERCONF:-legacy6}"
     [SVTRACKER]="${SVTRACKER:-}"
+    [MOTD]="${CONF_MOTD:-}"
 
     # Passwords
     [PASSWORD]="${PASSWORD:-}"
@@ -176,23 +177,27 @@ update_server_config() {
         # Remove any existing server_motd lines to prevent duplicates
         sed -i '/^set server_motd[0-9]/d' "${ETMAIN_DIR}/etl_server.cfg"
         
-        local motd_lines=()
-        while IFS= read -r line; do
-            motd_lines+=("$line")
-        done < <(printf '%s' "${CONF[MOTD]}" | sed 's/\\n/\n/g')
+        # Create a temporary file for MOTD lines
+        local temp_motd=$(mktemp)
         
-        # Append the MOTD lines
+        # Convert the MOTD string into lines and write to temp file
         local line_num=0
-        for line in "${motd_lines[@]}"; do
-            echo "set server_motd${line_num}          \"${line}\"" >> "${ETMAIN_DIR}/etl_server.cfg"
+        while IFS= read -r line || [ -n "$line" ]; do 
+            echo "set server_motd${line_num}          \"${line}\"" >> "$temp_motd"
+            ((line_num++))
+        done < <(echo -e "${CONF[MOTD]}" | sed 's/\\n/\n/g')
+        
+        # Fill remaining slots with empty strings
+        while [ $line_num -lt 6 ]; do
+            echo "set server_motd${line_num}          \"\"" >> "$temp_motd"
             ((line_num++))
         done
         
-        # Fill remaining slots with empty strings (up to server_motd5)
-        while [ $line_num -lt 6 ]; do
-            echo "set server_motd${line_num}          \"\"" >> "${ETMAIN_DIR}/etl_server.cfg"
-            ((line_num++))
-        done
+        # Insert the MOTD lines after sv_hostname
+        sed -i '/^set sv_hostname/r '"$temp_motd" "${ETMAIN_DIR}/etl_server.cfg"
+        
+        # Clean up
+        rm "$temp_motd"
     fi
     
     [ -f "${GAME_BASE}/extra.cfg" ] && cat "${GAME_BASE}/extra.cfg" >> "${ETMAIN_DIR}/etl_server.cfg"
