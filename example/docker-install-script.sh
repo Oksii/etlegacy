@@ -1864,15 +1864,23 @@ usage() {
     echo "  status   Show server status"
     echo "  logs     Show live logs for a server"
     echo "  rcon     Execute RCON command on a server"
+    echo "  update   Updates and restarts the server with the latest available image"
     echo
     echo "Examples:"
+    echo "Management Utilities" 
     echo "  etl-server start             # Starts all servers"
     echo "  etl-server stop 2            # Stops server instance 2"
     echo "  etl-server restart 1         # Restarts server instance 1"
-    echo "  etl-server status            # Shows status of all servers"
-    echo "  etl-server status 2          # Shows status of server 2"
     echo "  etl-server logs 1            # Shows live logs for server 1"
     echo "  etl-server rcon 2 map supply # Executes 'map supply' command on server 2"
+    echo "Status - Retrieves server stats and players"
+    echo "  etl-server status            # Shows status of all servers"
+    echo "  etl-server status 2          # Shows status of server 2"
+    echo "Update utility - Update Docker images and restart containers"
+    echo "  etl-server update            # Updates all server images if servers are empty"
+    echo "  etl-server update 2          # Updates server instance 2 if empty"
+    echo "  etl-server update --force    # Updates all servers regardless of players"
+    echo "  etl-server update 2 --force  # Updates server instance 2 regardless of players"
     exit 1
 }
 
@@ -1889,6 +1897,86 @@ format_duration() {
         echo "${hours}h ${minutes}m"
     else
         echo "${minutes}m"
+    fi
+}
+
+update_servers() {
+    local instance="$1"
+    local force="$2"
+    
+    if [ -z "$instance" ]; then
+        echo "Checking all servers for active players..."
+        local has_players=0
+        local player_info=""
+        
+        # Check each server for players using existing parse_quakestat function
+        for container in $(docker ps -a --filter "name=etl-server" --format "{{.Names}}" | sort); do
+            local port=$(docker inspect "$container" | grep -Po '"MAP_PORT=\K[^"]*')
+            local server_info=$(parse_quakestat "$container" "$port")
+            
+            if [ $? -eq 0 ]; then
+                local name map players
+                IFS='|' read -r name map players <<< "$server_info"
+                
+                if [ "${players:-0}" -gt 0 ]; then
+                    has_players=1
+                    player_info="${player_info}${container} (${name}): ${players} players on ${map}\n"
+                fi
+            fi
+        done
+        
+        if [ $has_players -eq 1 ] && [ "$force" != "--force" ]; then
+            echo -e "Warning: The following servers have active players:\n${player_info}"
+            echo "Use 'update --force' to update anyway, or wait until the servers are empty."
+            echo "You can check server status using: $0 status"
+            exit 1
+        fi
+        
+        echo "Updating all server images..."
+        $COMPOSE_CMD --env-file=$SETTINGS_FILE pull
+        
+        if [ $? -eq 0 ]; then
+            echo "Successfully pulled new images. Restarting services..."
+            $COMPOSE_CMD --env-file=$SETTINGS_FILE up -d
+        else
+            echo "Error pulling images. Please check your connection and try again."
+            exit 1
+        fi
+    else
+        local service_name="etl-server$instance"
+        local port=$(docker inspect "$service_name" | grep -Po '"MAP_PORT=\K[^"]*')
+        local server_info=$(parse_quakestat "$service_name" "$port")
+        
+        if [ $? -eq 0 ]; then
+            local name map players
+            IFS='|' read -r name map players <<< "$server_info"
+            
+            if [ "${players:-0}" -gt 0 ] && [ "$force" != "--force" ]; then
+                echo "Warning: Server $service_name ($name) has $players active players on map $map!"
+                echo "Use 'update $instance --force' to update anyway, or wait until the server is empty."
+                echo "You can check server status using: $0 status $instance"
+                exit 1
+            fi
+        fi
+        
+        echo "Updating server $instance..."
+        local image=$(docker inspect "$service_name" --format='{{.Config.Image}}' 2>/dev/null)
+        
+        if [ -z "$image" ]; then
+            echo "Error: Container $service_name not found"
+            exit 1
+        fi
+        
+        echo "Pulling new image for $service_name..."
+        docker pull "$image"
+        
+        if [ $? -eq 0 ]; then
+            echo "Successfully pulled new image. Restarting service..."
+            $COMPOSE_CMD --env-file=$SETTINGS_FILE up -d "$service_name"
+        else
+            echo "Error pulling image. Please check your connection and try again."
+            exit 1
+        fi
     fi
 }
 
@@ -2062,6 +2150,9 @@ case $ACTION in
             shift 2
             execute_rcon "$INSTANCE" "$*"
         fi
+        ;;
+    update)
+        update_servers "$INSTANCE"
         ;;
     *)
         usage
