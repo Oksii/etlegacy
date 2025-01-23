@@ -82,13 +82,13 @@ Available environment variables:
 
 Environment Variable  | Description                    | Defaults
 --------------------- | ------------------------------ | ------------------------
-REDIRECTURL           | URL of HTTP downloads          | ``https://index.example.com/et``
+REDIRECTURL           | URL of HTTP downloads          | ``https://dl.etl.lol/maps/et``
 MAP_PORT              | Container port (internal)      | ``27960``
 MAXCLIENTS            | Maximum number of players      | ``32``
 AUTO_UPDATE           | Update configurations on restart? | ``true``
-SVTRACKER             | Set sv_tracker endpoint        | ``tracker.etl.lol:4444``
-XMAS                  | Use optional XMAS pk3          | ``false`` 
-XMAS_URL              | Provide URL to download xmas.pk3 | ``None`` 
+SVTRACKER             | Set sv_tracker endpoint, defaults to ``et.trackbase.net:4444`` via ETL defaults, if none is set. | ``None``
+ASSETS                | Download optional assets to ``./legacy`` dir. e.g ``zzz_levelshots.pk3``. | ``false`` 
+ASSETS_URL            | Provide direct link URL to download assets.pk3 | ``None`` 
 SETTINGSURL           | The git URL (must be HTTP public) for the ETL settings repository. | ``https://github.com/Oksii/legacy-configs.git``
 SETTINGSPAT           | Github PAT token for private repos | ``None``
 SETTINGSBRANCH        | The git branch for the ETL settings repository. | ``main``

@@ -29,9 +29,9 @@ safe_copy() {
 # Config defaults
 declare -A CONF=(
     # Server settings
-    [HOSTNAME]="${HOSTNAME:-ET}"
+    [HOSTNAME]="${HOSTNAME:-ETL Docker Server}"
     [MAP_PORT]="${MAP_PORT:-27960}"
-    [REDIRECTURL]="${REDIRECTURL:-}"
+    [REDIRECTURL]="${REDIRECTURL:-https://dl.etl.lol/maps/et}"
     [MAXCLIENTS]="${MAXCLIENTS:-32}"
     [STARTMAP]="${STARTMAP:-radar}"
     [TIMEOUTLIMIT]="${TIMEOUTLIMIT:-1}"
@@ -67,9 +67,9 @@ declare -A CONF=(
     [STATS_API_DAMAGESTAT]="${STATS_API_DAMAGESTAT:-false}"
     [STATS_API_DUMPJSON]="${STATS_API_DUMPJSON:-false}"
 
-    # XMAS settings
-    [XMAS]="${XMAS:-false}"
-    [XMAS_URL]="${XMAS_URL:-}"
+    # extra assets settings
+    [ASSETS]="${ASSETS:-false}"
+    [ASSETS_URL]="${ASSETS_URL:-}"
 )
 
 
@@ -203,16 +203,13 @@ update_server_config() {
     [ -f "${GAME_BASE}/extra.cfg" ] && cat "${GAME_BASE}/extra.cfg" >> "${ETMAIN_DIR}/etl_server.cfg"
 }
 
-# Download XMAS content if enabled
-handle_xmas_content() {
-    [ "${CONF[XMAS]}" = "true" ] || return 0
+# Download extra assets if enabled
+handle_extra_content() {
+    [ "${CONF[ASSETS]}" = "true" ] || return 0
     
-    local xmas_file="${LEGACY_DIR}/z_xmas.pk3"
-    [ -f "$xmas_file" ] && return 0
-    
-    log_info "Downloading XMAS assets..."
-    wget -q --show-progress -O "$xmas_file" "${CONF[XMAS_URL]}" ||
-        { rm -f "$xmas_file"; log_warning "Failed to download XMAS assets"; return 1; }
+    log_info "Downloading assets..."
+    wget -q --show-progress -P "${LEGACY_DIR}" "${CONF[ASSETS_URL]}" ||
+        { log_warning "Failed to download assets"; return 1; }
 }
 
 # Update the game-stats-web.lua configuration
@@ -250,7 +247,7 @@ parse_cli_args() {
 download_maps
 copy_game_assets
 update_server_config
-handle_xmas_content
+handle_extra_content
 $STATS_ENABLED && configure_stats_api
 
 ADDITIONAL_ARGS=($(parse_cli_args))
