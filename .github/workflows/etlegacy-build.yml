@@ -62,30 +62,44 @@ jobs:
           # Function to extract version from URL
           get_version_from_url() {
             local url=$1
-            if [[ $url =~ etlegacy-v([0-9]+\.[0-9]+\.[0-9]+-[0-9]+) ]]; then
-              echo "${BASH_REMATCH[1]}"
+            # Pattern for versions with git commit info (e.g., v2.82.1-351-gfca1d03)
+            if [[ $url =~ etlegacy-v([0-9]+\.[0-9]+\.[0-9]+-[0-9]+)-g[a-f0-9]+-(x86_64|aarch64)\.tar\.gz ]]; then
+              echo "${BASH_REMATCH[1]}" # Returns just 2.82.1-351
+            # Pattern for clean versions (e.g., v2.83.0)
+            elif [[ $url =~ etlegacy-v([0-9]+\.[0-9]+\.[0-9]+)-(x86_64|aarch64)\.tar\.gz ]]; then
+              echo "${BASH_REMATCH[1]}" # Returns just 2.83.0
+            else
+              return 1
             fi
           }
           
           # Function to compare version strings
           version_gt() {
+            local v1=$1
+            local v2=$2
+            
             # Split version strings into components
-            IFS='-' read -ra VER1 <<< "$1"
-            IFS='-' read -ra VER2 <<< "$2"
+            IFS='-' read -ra VER1 <<< "$v1"
+            IFS='-' read -ra VER2 <<< "$v2"
             
             # Compare main version numbers first (2.83.1)
-            if [ "$(printf '%s\n' "${VER1[0]}" "${VER2[0]}" | sort -V | head -n 1)" != "${VER1[0]}" ]; then
-                return 0
+            if [ "$(printf '%s\n' "${VER1[0]}" "${VER2[0]}" | sort -V | head -n1)" != "${VER1[0]}" ]; then
+              return 0
             elif [ "${VER1[0]}" != "${VER2[0]}" ]; then
-                return 1
+              return 1
             fi
             
-            # If main versions are equal, compare build numbers
+            # If main versions are equal, compare build numbers if they exist
             if [ ${#VER1[@]} -gt 1 ] && [ ${#VER2[@]} -gt 1 ]; then
-                # Compare build numbers
-                if [ "${VER1[1]}" -gt "${VER2[1]}" ]; then
-                    return 0
-                fi
+              [ "${VER1[1]}" -gt "${VER2[1]}" ]
+              return
+            fi
+            
+            # If one has a build number and the other doesn't, the one without is newer
+            if [ ${#VER1[@]} -eq 1 ] && [ ${#VER2[@]} -gt 1 ]; then
+              return 0
+            elif [ ${#VER1[@]} -gt 1 ] && [ ${#VER2[@]} -eq 1 ]; then
+              return 1
             fi
             
             return 1
