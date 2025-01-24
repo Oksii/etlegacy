@@ -285,7 +285,7 @@ jobs:
           BOTO_VERIFY_SSL: "FALSE"
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 10
+          timeout_minutes: 5
           max_attempts: 3
           retry_wait_seconds: 30
           command: |
@@ -305,13 +305,7 @@ jobs:
               echo "Error: Could not find pk3 file"
               exit 1
             fi
-            
-            echo "Uploading PK3 to R2..."
-            aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --no-verify-ssl \
-              --only-show-errors 2>/dev/null
-            
+
             echo "Uploading PK3 to R2..."
             aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
               --endpoint-url "$R2_ENDPOINT" \
@@ -324,14 +318,14 @@ jobs:
               curl -sSL -O "${{ steps.version.outputs.arm_url }}"
               
               ARM_TAR_GZ_FILE=$(basename "${{ steps.version.outputs.arm_url }}")
-              
+
               echo "Uploading ARM snapshot to R2..."
               aws s3 cp "$ARM_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$ARM_TAR_GZ_FILE" \
                 --endpoint-url "$R2_ENDPOINT" \
                 --no-verify-ssl \
                 --only-show-errors 2>/dev/null
             fi
-            
+
             cd - > /dev/null
             rm -rf $TEMP_DIR
     
