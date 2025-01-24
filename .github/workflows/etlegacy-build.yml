@@ -282,16 +282,12 @@ jobs:
           REQUESTS_CA_BUNDLE: ""
           AWS_CA_BUNDLE: ""
           BOTO_VERIFY_SSL: "FALSE"
+          AWS_MAX_ATTEMPTS: "10"
+          AWS_RETRY_MODE: "adaptive"
+          AWS_S3_MULTIPART_THRESHOLD: "5242880"
+          AWS_S3_MULTIPART_CHUNKSIZE: "5242880"
         run: |
-          # Disable SSL warnings in Python
-          python3 -c "
-          import urllib3
-          import warnings
-          urllib3.disable_warnings()
-          warnings.filterwarnings('ignore', category=urllib3.exceptions.InsecureRequestWarning)
-          "
-          
-          set -e  # Exit on any error
+          set -x  # Enable command tracing
           
           TEMP_DIR=$(mktemp -d)
           cd $TEMP_DIR
@@ -313,23 +309,22 @@ jobs:
           # Verify file exists and is readable
           ls -l "$PK3_PATH"
           
-          # Create destination path
-          DEST_PATH="maps/et/legacy/$(basename "$PK3_PATH")"
-          echo "Debug: Destination path: $DEST_PATH"
-          
-          # Try upload with maximum verbosity
-          echo "Debug: Attempting upload to s3://$R2_BUCKET/$DEST_PATH"
-          aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/$DEST_PATH" \
+          # First try: Single-part upload
+          echo "Attempting single-part upload..."
+          if aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/$DEST_PATH" \
             --endpoint-url "$R2_ENDPOINT" \
             --no-verify-ssl \
-            --debug 2>&1
-          
-          # If upload fails, try listing the destination directory
-          echo "Debug: Checking destination directory..."
-          aws s3 ls "s3://$R2_BUCKET/maps/et/legacy/" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --no-verify-ssl \
-            --debug
+            --no-multipart-upload \
+            --debug; then
+            echo "Single-part upload successful"
+          else
+            echo "Single-part upload failed, attempting multipart upload with smaller chunks..."
+            # Second try: Multipart upload with smaller chunks
+            aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/$DEST_PATH" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --no-verify-ssl \
+              --debug
+          fi
           
           echo "Uploading x86_64 snapshot to R2..."
           aws s3 cp "$X86_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$X86_TAR_GZ_FILE" \
