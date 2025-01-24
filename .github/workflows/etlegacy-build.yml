@@ -271,6 +271,7 @@ jobs:
 
       - name: Extract and Upload PK3
         if: github.event.inputs.set_stable == '' && steps.version.outputs.needs_build == 'true'
+        continue-on-error: true
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -282,73 +283,58 @@ jobs:
           REQUESTS_CA_BUNDLE: ""
           AWS_CA_BUNDLE: ""
           BOTO_VERIFY_SSL: "FALSE"
-          AWS_MAX_ATTEMPTS: "10"
-          AWS_RETRY_MODE: "adaptive"
-          AWS_S3_MULTIPART_THRESHOLD: "5242880"
-          AWS_S3_MULTIPART_CHUNKSIZE: "5242880"
-        run: |
-          set -x  # Enable command tracing
-          
-          TEMP_DIR=$(mktemp -d)
-          cd $TEMP_DIR
-          
-          # Download and process x86_64 version
-          echo "Downloading x86_64 ET Legacy snapshot..."
-          curl -sSL -O "${{ steps.version.outputs.version_url }}"
-          
-          X86_TAR_GZ_FILE=$(basename "${{ steps.version.outputs.version_url }}")
-          tar xzf "$X86_TAR_GZ_FILE"
-          
-          # Extract and upload PK3 from x86_64
-          PK3_PATH=$(find . -name "legacy_*.pk3")
-          if [ -z "$PK3_PATH" ]; then
-            echo "Error: Could not find pk3 file"
-            exit 1
-          fi
-
-          # Verify file exists and is readable
-          ls -l "$PK3_PATH"
-          
-          # First try: Single-part upload
-          echo "Attempting single-part upload..."
-          if aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/$DEST_PATH" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --no-verify-ssl \
-            --no-multipart-upload \
-            --debug; then
-            echo "Single-part upload successful"
-          else
-            echo "Single-part upload failed, attempting multipart upload with smaller chunks..."
-            # Second try: Multipart upload with smaller chunks
-            aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/$DEST_PATH" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --no-verify-ssl \
-              --debug
-          fi
-          
-          echo "Uploading x86_64 snapshot to R2..."
-          aws s3 cp "$X86_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$X86_TAR_GZ_FILE" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --no-verify-ssl \
-            --only-show-errors 2>/dev/null
-
-          # If ARM version is available, download and upload it too
-          if [ "${{ steps.version.outputs.arm_available }}" = "true" ]; then
-            echo "Downloading ARM ET Legacy snapshot..."
-            curl -sSL -O "${{ steps.version.outputs.arm_url }}"
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            set -e
+            TEMP_DIR=$(mktemp -d)
+            cd $TEMP_DIR
             
-            ARM_TAR_GZ_FILE=$(basename "${{ steps.version.outputs.arm_url }}")
+            echo "Downloading x86_64 ET Legacy snapshot..."
+            curl -sSL -O "${{ steps.version.outputs.version_url }}"
             
-            echo "Uploading ARM snapshot to R2..."
-            aws s3 cp "$ARM_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$ARM_TAR_GZ_FILE" \
+            X86_TAR_GZ_FILE=$(basename "${{ steps.version.outputs.version_url }}")
+            tar xzf "$X86_TAR_GZ_FILE"
+            
+            # Extract and upload PK3 from x86_64
+            PK3_PATH=$(find . -name "legacy_*.pk3")
+            if [ -z "$PK3_PATH" ]; then
+              echo "Error: Could not find pk3 file"
+              exit 1
+            fi
+            
+            echo "Uploading PK3 to R2..."
+            aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
               --endpoint-url "$R2_ENDPOINT" \
               --no-verify-ssl \
               --only-show-errors 2>/dev/null
-          fi
-          
-          cd - > /dev/null
-          rm -rf $TEMP_DIR
-  
+            
+            echo "Uploading PK3 to R2..."
+            aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --no-verify-ssl \
+              --only-show-errors 2>/dev/null
+
+            # If ARM version is available, download and upload it too
+            if [ "${{ steps.version.outputs.arm_available }}" = "true" ]; then
+              echo "Downloading ARM ET Legacy snapshot..."
+              curl -sSL -O "${{ steps.version.outputs.arm_url }}"
+              
+              ARM_TAR_GZ_FILE=$(basename "${{ steps.version.outputs.arm_url }}")
+              
+              echo "Uploading ARM snapshot to R2..."
+              aws s3 cp "$ARM_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$ARM_TAR_GZ_FILE" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --no-verify-ssl \
+                --only-show-errors 2>/dev/null
+            fi
+            
+            cd - > /dev/null
+            rm -rf $TEMP_DIR
+    
       - name: Set stable tag
         if: github.event.inputs.set_stable != ''
         run: |
