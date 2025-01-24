@@ -296,19 +296,28 @@ jobs:
           TEMP_DIR=$(mktemp -d)
           cd $TEMP_DIR
           
-          # Download and process x86_64 version
-          echo "Downloading x86_64 ET Legacy snapshot..."
-          curl -sSL -O "${{ steps.version.outputs.version_url }}"
+          echo "Debug: Downloading from ${{ steps.version.outputs.version_url }}"
+          curl -v -sSL -O "${{ steps.version.outputs.version_url }}"
           
           X86_TAR_GZ_FILE=$(basename "${{ steps.version.outputs.version_url }}")
-          tar xzf "$X86_TAR_GZ_FILE"
+          echo "Debug: Extracting $X86_TAR_GZ_FILE"
+          tar xzvf "$X86_TAR_GZ_FILE"
           
           # Extract and upload PK3 from x86_64
+          echo "Debug: Looking for PK3 file"
           PK3_PATH=$(find . -name "legacy_*.pk3")
           if [ -z "$PK3_PATH" ]; then
             echo "Error: Could not find pk3 file"
             exit 1
           fi
+
+          echo "Debug: Found PK3 at $PK3_PATH"
+
+          echo "Testing R2 connection..."
+          aws s3 ls "s3://$R2_BUCKET" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --no-verify-ssl \
+            --debug
           
           echo "Uploading PK3 to R2..."
           aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
