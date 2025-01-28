@@ -278,6 +278,8 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET_NAME }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           AWS_DEFAULT_REGION: auto
+          AWS_S3_REQUEST_CHECKSUM_CALCULATION: 'WHEN_REQUIRED'
+          AWS_S3_RESPONSE_CHECKSUM_VALIDATION: 'WHEN_REQUIRED'
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
@@ -285,10 +287,6 @@ jobs:
           retry_wait_seconds: 30
           command: |
             set -e
-            
-            # Configure AWS CLI
-            aws configure set default.s3.addressing_style path
-            aws configure set default.s3.signature_version s3v4
             
             TEMP_DIR=$(mktemp -d)
             cd $TEMP_DIR
@@ -314,8 +312,7 @@ jobs:
 
             echo "Uploading PK3 to R2..."
             aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --debug
+              --endpoint-url "$R2_ENDPOINT"
 
             # If ARM version is available, download and upload it too
             if [ "${{ steps.version.outputs.arm_available }}" = "true" ]; then
@@ -326,9 +323,7 @@ jobs:
 
               echo "Uploading ARM snapshot to R2..."
               aws s3 cp "$ARM_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$ARM_TAR_GZ_FILE" \
-                --endpoint-url "$R2_ENDPOINT" \
-                --debug
-
+                --endpoint-url "$R2_ENDPOINT"
             fi
 
             cd - > /dev/null
