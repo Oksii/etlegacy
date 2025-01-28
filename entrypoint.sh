@@ -231,13 +231,13 @@ configure_stats_api() {
             -e "s|%CONF_STATS_API_URL_SUBMIT%|${CONF[STATS_API_URL_SUBMIT]}|g" \
             -e "s|%CONF_STATS_API_URL_MATCHID%|${CONF[STATS_API_URL_MATCHID]}|g" \
             -e "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" \
-            -e "s/%CONF_STATS_API_LOG%/${CONF[STATS_API_LOG]}/g" \
-            -e "s/%CONF_STATS_API_OBITUARIES%/${CONF[STATS_API_OBITUARIES]}/g" \
-            -e "s/%CONF_STATS_API_MESSAGELOG%/${CONF[STATS_API_MESSAGELOG]}/g" \
-            -e "s/%CONF_STATS_API_DAMAGESTAT%/${CONF[STATS_API_DAMAGESTAT]}/g" \
-            -e "s/%CONF_STATS_API_OBJSTATS%/${CONF[STATS_API_OBJSTATS]}/g" \
-            -e "s/%CONF_STATS_API_DUMPJSON%/${CONF[STATS_API_DUMPJSON]}/g" \
-            -e "s/%CONF_STATS_API_SHOVESTATS%/${CONF[STATS_API_SHOVESTATS]}/g" \
+            -e 's/"%CONF_STATS_API_LOG%"/'${CONF[STATS_API_LOG]}'/g' \
+            -e 's/"%CONF_STATS_API_OBITUARIES%"/'${CONF[STATS_API_OBITUARIES]}'/g' \
+            -e 's/"%CONF_STATS_API_MESSAGELOG%"/'${CONF[STATS_API_MESSAGELOG]}'/g' \
+            -e 's/"%CONF_STATS_API_DAMAGESTAT%"/'${CONF[STATS_API_DAMAGESTAT]}'/g' \
+            -e 's/"%CONF_STATS_API_OBJSTATS%"/'${CONF[STATS_API_OBJSTATS]}'/g' \
+            -e 's/"%CONF_STATS_API_DUMPJSON%"/'${CONF[STATS_API_DUMPJSON]}'/g' \
+            -e 's/"%CONF_STATS_API_SHOVESTATS%"/'${CONF[STATS_API_SHOVESTATS]}'/g' \
             "$config_file"
     }
 }
