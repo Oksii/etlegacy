@@ -1600,6 +1600,8 @@ setup_stats_variables() {
         store_setting "Stats Configuration" "STATS_API_OBITUARIES" "false"
         store_setting "Stats Configuration" "STATS_API_DAMAGESTAT" "false"
         store_setting "Stats Configuration" "STATS_API_MESSAGELOG" "false"
+        store_setting "Stats Configuration" "STATS_API_OBJSTATS" "true"
+        store_setting "Stats Configuration" "STATS_API_SHOVESTATS" "true"
         store_setting "Stats Configuration" "STATS_API_DUMPJSON" "false"
     else
         store_setting "Stats Configuration" "STATS_SUBMIT" "false"

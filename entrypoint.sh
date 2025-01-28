@@ -65,6 +65,8 @@ declare -A CONF=(
     [STATS_API_OBITUARIES]="${STATS_API_OBITUARIES:-true}"
     [STATS_API_MESSAGELOG]="${STATS_API_MESSAGELOG:-false}"
     [STATS_API_DAMAGESTAT]="${STATS_API_DAMAGESTAT:-false}"
+    [STATS_API_SHOVESTATS]="${STATS_API_SHOVESTATS:-true}"
+    [STATS_API_OBJSTATS]="${STATS_API_OBJSTATS:-true}"
     [STATS_API_DUMPJSON]="${STATS_API_DUMPJSON:-false}"
 
     # extra assets settings
@@ -212,21 +214,28 @@ handle_extra_content() {
         { log_warning "Failed to download assets"; return 1; }
 }
 
-# Update the game-stats-web.lua configuration
+# Update the config.toml for obj-track and game-stats-web.lua
 configure_stats_api() {
-    local lua_file="${LEGACY_DIR}/luascripts/game-stats-web.lua"
-    [ -f "$lua_file" ] || return 0
+    local config_file="${LEGACY_DIR}/luascripts/config.toml"
     
-    # Replace configuration placeholders
-    sed -i "s/%CONF_STATS_API_LOG%/${CONF[STATS_API_LOG]}/g" "$lua_file"
-    sed -i "s|%CONF_STATS_API_URL_SUBMIT%|${CONF[STATS_API_URL_SUBMIT]}|g" "$lua_file"
-    sed -i "s|%CONF_STATS_API_URL_MATCHID%|${CONF[STATS_API_URL_MATCHID]}|g" "$lua_file"
-    sed -i "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" "$lua_file" 
-    sed -i "s/%CONF_STATS_API_TOKEN%/${CONF[STATS_API_TOKEN]}/g" "$lua_file"   
-    sed -i "s/%CONF_STATS_API_OBITUARIES%/${CONF[STATS_API_OBITUARIES]}/g" "$lua_file"
-    sed -i "s/%CONF_STATS_API_MESSAGELOG%/${CONF[STATS_API_MESSAGELOG]}/g" "$lua_file"
-    sed -i "s/%CONF_STATS_API_DAMAGESTAT%/${CONF[STATS_API_DAMAGESTAT]}/g" "$lua_file"
-    sed -i "s/%CONF_STATS_API_DUMPJSON%/${CONF[STATS_API_DUMPJSON]}/g" "$lua_file"
+    # set docker_config true
+    sed -i 's/docker_config = false/docker_config = true/' "$config_file"
+
+    [ -f "$config_file" ] && {
+        sed -i \
+            -e "s/%CONF_STATS_API_TOKEN%/${CONF[STATS_API_TOKEN]}/g" \
+            -e "s|%CONF_STATS_API_URL_SUBMIT%|${CONF[STATS_API_URL_SUBMIT]}|g" \
+            -e "s|%CONF_STATS_API_URL_MATCHID%|${CONF[STATS_API_URL_MATCHID]}|g" \
+            -e "s|%CONF_STATS_API_PATH%|${CONF[STATS_API_PATH]}|g" \
+            -e "s/%CONF_STATS_API_LOG%/${CONF[STATS_API_LOG]}/g" \
+            -e "s/%CONF_STATS_API_OBITUARIES%/${CONF[STATS_API_OBITUARIES]}/g" \
+            -e "s/%CONF_STATS_API_MESSAGELOG%/${CONF[STATS_API_MESSAGELOG]}/g" \
+            -e "s/%CONF_STATS_API_DAMAGESTAT%/${CONF[STATS_API_DAMAGESTAT]}/g" \
+            -e "s/%CONF_STATS_API_OBJSTATS%/${CONF[STATS_API_OBJSTATS]}/g" \
+            -e "s/%CONF_STATS_API_DUMPJSON%/${CONF[STATS_API_DUMPJSON]}/g" \
+            -e "s/%CONF_STATS_API_SHOVESTATS%/${CONF[STATS_API_SHOVESTATS]}/g" \
+            "$config_file"
+    }
 }
 
 # Parse additional CLI arguments

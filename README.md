@@ -117,9 +117,11 @@ STATS_API_PATH        | Path to to save logfile to     | `/legacy/homepath/legac
 STATS_API_URL_SUBMIT  | Sets endpoint for the API to SUBMIT match_report to | ``None``
 STATS_API_URL_MATCHID | Gather Automation. Will fetch matchID from specified base_url/server_ip/server_port endpoint | ``None``
 STATS_API_DUMPJSON    | Debug, dump stats json to file before sending | ``false``
+STATS_API_OBJDEBUG    | Debug, print debug logs in STATS_API_LOG for objective related events | ``false``
 STATS_API_LOG         | Enable logging in game-stats-web.lua | ``false``
-STATS_API_OBITUARIES  | Collect and submit Obituaries in json report  | ``false``
+STATS_API_OBITUARIES  | Collect and submit Obituaries in json report  | ``true``
 STATS_API_DAMAGESTAT  | Collect and submit damage events in json report | ``false``
+STATS_API_OBJSTATS    | Collect and submit objective stats in json report | ``true``
 STATS_API_MESSAGELOG  | Collect and submit server messages in json report | ``false``
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
