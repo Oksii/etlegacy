@@ -307,14 +307,12 @@ jobs:
               exit 1
             fi
 
-            echo "Testing R2 connection..."
-            if ! aws s3 ls "s3://$R2_BUCKET" --endpoint-url "$R2_ENDPOINT"; then
-              echo "Error: Could not list R2 bucket contents"
-              exit 1
-            fi
-
             echo "Uploading PK3 to R2..."
             aws s3 cp "$PK3_PATH" "s3://$R2_BUCKET/maps/et/legacy/$(basename $PK3_PATH)" \
+              --endpoint-url "$R2_ENDPOINT"
+
+            echo "Uploading x86_64 snapshot to R2..."
+            aws s3 cp "$X86_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$X86_TAR_GZ_FILE" \
               --endpoint-url "$R2_ENDPOINT"
 
             # If ARM version is available, download and upload it too
