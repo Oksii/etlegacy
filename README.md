@@ -21,7 +21,7 @@ By default this is [legacy-configs](https://github.com/Oksii/legacy-configs)
 - Based on [msh100's rtcwpro repository](https://github.com/msh100/rtcw) with significant changes
 - Tag `stable` is recommended for competitive play and actively maintained. 
 - Automatic builds triggered by [ET:Legacy snapshot](https://www.etlegacy.com/workflow-files) releases
-- Available tags listed on [Docker Hub](https://hub.docker.com/repository/docker/oksii/etlegacy)
+- Available tags listed on [Docker Hub](https://hub.docker.com/r/oksii/etlegacy)
 - Includes `autorestart.sh` for performance maintenance. Will check for active players before restarting:
   ```bash
   # Example cron setup
