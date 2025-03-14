@@ -72,6 +72,12 @@ declare -A CONF=(
     # extra assets settings
     [ASSETS]="${ASSETS:-false}"
     [ASSETS_URL]="${ASSETS_URL:-}"
+
+    # Tracker API settings
+    [TRACKER]="${TRACKER:-false}"
+    [TRACKER_API_ENDPOINT]="${TRACKER_API_ENDPOINT:-}"
+    [TRACKER_API_TOKEN]="${TRACKER_API_TOKEN:-}"
+    [TRACKER_DEBUG]="${TRACKER_DEBUG:-false}"
 )
 
 
@@ -83,6 +89,12 @@ if [ "${CONF[STATS_SUBMIT]}" = "true" ]; then
     if [ "${CONF[SETTINGSBRANCH]}" = "main" ]; then
         CONF[SETTINGSBRANCH]="etl-stats-api"
     fi
+fi
+
+# Enable/Disable TRACKER
+TRACKER_ENABLED=false
+if [ "${CONF[TRACKER]}" = "true" ]; then
+    TRACKER_ENABLED=true
 fi
 
 # Fetch configs from repo
@@ -242,6 +254,20 @@ configure_stats_api() {
     }
 }
 
+# Update the tracker.lua configuration
+configure_tracker_api() {
+    local tracker_file="${LEGACY_DIR}/luascripts/tracker.lua"
+    
+    [ -f "$tracker_file" ] && {
+        sed -i \
+            -e "s|%CONF_TRACKER_API_ENDPOINT%|${CONF[TRACKER_API_ENDPOINT]}|g" \
+            -e "s|%CONF_TRACKER_API_TOKEN%|${CONF[TRACKER_API_TOKEN]}|g" \
+            -e 's/"%CONF_TRACKER_DEBUG%"/'${CONF[TRACKER_DEBUG]}'/g' \
+            -e 's/%CONF_TRACKER_DEBUG%/'${CONF[TRACKER_DEBUG]}'/g' \
+            "$tracker_file"
+    }
+}
+
 # Parse additional CLI arguments
 parse_cli_args() {
     local args=()
@@ -262,6 +288,7 @@ copy_game_assets
 update_server_config
 handle_extra_content
 $STATS_ENABLED && configure_stats_api
+$TRACKER_ENABLED && configure_tracker_api
 
 ADDITIONAL_ARGS=($(parse_cli_args))
 
