@@ -1745,7 +1745,7 @@ generate_service() {
     # Store optional passwords only if they're not empreorganize_settings_filety
     [ -n "$password" ] && store_server_setting "$instance" "PASSWORD" "$password"
     [ -n "$rcon" ] && store_server_setting "$instance" "RCONPASSWORD" "$rcon"
-    [ -n "$referee" ] && store_server_setting "$instance" "REFEREEPASSWORD" "$referee"
+    [ -n "$referee" ] && store_server_setting "$instance" "REFPASSWORD" "$referee"
     [ -n "$sc" ] && store_server_setting "$instance" "SCPASSWORD" "$sc"
 
     # Generate only the basic service structure without environment variables
@@ -2028,7 +2028,7 @@ get_container_status() {
     port=$(docker inspect "$container" | grep -Po '"MAP_PORT=\K[^"]*' || echo "-")
     password=$(docker inspect "$container" | grep -Po '"PASSWORD=\K[^"]*' || echo "-")
     rconpass=$(docker inspect "$container" | grep -Po '"RCONPASSWORD=\K[^"]*' || echo "-")
-    refpass=$(docker inspect "$container" | grep -Po '"REFEREEPASSWORD=\K[^"]*' || echo "-")
+    refpass=$(docker inspect "$container" | grep -Po '"REFPASSWORD=\K[^"]*' || echo "-")
 
     # Get additional server info if container is running
     local server_info map players name
