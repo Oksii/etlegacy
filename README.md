@@ -123,6 +123,11 @@ STATS_API_OBITUARIES  | Collect and submit Obituaries in json report  | ``true``
 STATS_API_DAMAGESTAT  | Collect and submit damage events in json report | ``false``
 STATS_API_OBJSTATS    | Collect and submit objective stats in json report | ``true``
 STATS_API_MESSAGELOG  | Collect and submit server messages in json report | ``false``
+STATS_API_SHOVESTATS  | Collect and submit shove stats in json report | ``true``
+STATS_API_MOVEMENTSTATS | Collect and submit movement stats in json report | ``true``
+STATS_API_STANCESTATS | Collect and submit stance stats in json report | ``true``
+STATS_API_ALTMAPSCRIPTS | Enable alternative map scripts (bobika mapscripts) | ``false``
+STATS_API_FORCERENAME | Force player name standardization | ``false``
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
 configuration at `/legacy/server/extra.cfg`.
