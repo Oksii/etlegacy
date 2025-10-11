@@ -271,6 +271,7 @@ jobs:
 
       - name: Extract and Upload PK3
         if: github.event.inputs.set_stable == '' && steps.version.outputs.needs_build == 'true'
+        id: extract_assets
         continue-on-error: true
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -315,6 +316,28 @@ jobs:
             aws s3 cp "$X86_TAR_GZ_FILE" "s3://$R2_BUCKET/docker/etl/snapshots/$X86_TAR_GZ_FILE" \
               --endpoint-url "$R2_ENDPOINT"
 
+            # Extract metainfo XML
+            echo "Extracting metainfo XML..."
+            METAINFO_PATH=$(find . -path "*/metainfo/com.etlegacy.ETLegacy.metainfo.xml")
+            
+            if [ -z "$METAINFO_PATH" ]; then
+              echo "Warning: Could not find metainfo XML file"
+            else
+              echo "Found metainfo at: $METAINFO_PATH"
+              
+              # Extract version and date from XML
+              RELEASE_VERSION=$(grep -oP '<release version="\K[^"]+' "$METAINFO_PATH" | head -1)
+              RELEASE_DATE=$(grep -oP '<release version="[^"]+" date="\K[^"]+' "$METAINFO_PATH" | head -1)
+              
+              if [ -n "$RELEASE_VERSION" ] && [ -n "$RELEASE_DATE" ]; then
+                echo "Extracted release info - Version: $RELEASE_VERSION, Date: $RELEASE_DATE"
+                echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+                echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+              else
+                echo "Warning: Could not extract version/date from metainfo XML"
+              fi
+            fi
+
             # If ARM version is available, download and upload it too
             if [ "${{ steps.version.outputs.arm_available }}" = "true" ]; then
               echo "Downloading ARM ET Legacy snapshot..."
@@ -329,6 +352,23 @@ jobs:
 
             cd - > /dev/null
             rm -rf $TEMP_DIR
+
+      - name: Notify API of New Release
+        if: github.event.inputs.set_stable == '' && steps.version.outputs.needs_build == 'true' && steps.extract_assets.outputs.release_version != ''
+        continue-on-error: true
+        run: |
+          curl -X POST "${{ secrets.API_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.API_TOK }}" \
+            -d '{
+              "version": "${{ steps.extract_assets.outputs.release_version }}",
+              "release_date": "${{ steps.extract_assets.outputs.release_date }}",
+              "docker_tag": "${{ steps.version.outputs.version }}",
+              "download_url": "${{ steps.version.outputs.version_url }}",
+              "arm_available": ${{ steps.version.outputs.arm_available }},
+              "workflow_run_id": "${{ github.run_id }}"
+            }' \
+            --max-time 5 || true
     
       - name: Set stable tag
         if: github.event.inputs.set_stable != ''
