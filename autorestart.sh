@@ -19,8 +19,8 @@ fi
 
 echo "Current player count: $player_count"
 
-if [ "$player_count" -le 2 ]; then
-    echo "2 or fewer players are active. Proceeding with server restart."
+if [ "$player_count" -eq 0 ]; then
+    echo "Server is empty. Proceeding with server restart."
     timeout 5 icecon "localhost:$MAP_PORT" "${RCONPASSWORD}" -c "quit"
     exit_code=$?
 
@@ -32,6 +32,6 @@ if [ "$player_count" -le 2 ]; then
         exit 1
     fi
 else
-    echo "More than 2 players active ($player_count players). Skipping restart to avoid disruption."
+    echo "Players active ($player_count players). Skipping restart to avoid disruption."
     exit 1
 fi
