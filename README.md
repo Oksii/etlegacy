@@ -102,7 +102,7 @@ MAPS                  | List of maps seperated by ':'. | Default 6 maps
 STARTMAP              | Map server starts on.          | ``radar``
 PASSWORD              | Server password.               | ``None``
 RCONPASSWORD          | RCON password.                 | ``None``
-REFEREEPASSWORD       | Referee password.              | ``None``
+REFPASSWORD           | Referee password.              | ``None``
 SCPASSWORD            | Shoutcaster password.          | ``None``
 HOSTNAME              | Server hostname.               | ``ET Docker Server``
 CONF_MOTD             | MOTD line on connect. Use `\n` to indicate a new line or change in ``server_motd[%]`` | ``None``
