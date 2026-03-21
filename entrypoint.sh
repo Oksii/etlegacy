@@ -161,14 +161,8 @@ copy_game_assets() {
         safe_copy "$mapscript" "${ETMAIN_DIR}/mapscripts/"
     done
     
-    # Copy luascripts and command maps
-    for luascript in "${SETTINGS_BASE}/luascripts/"*.lua; do
-        safe_copy "$luascript" "${LEGACY_DIR}/luascripts/"
-    done
-    
-    for tomlfile in "${SETTINGS_BASE}/luascripts/"*.toml; do
-        safe_copy "$tomlfile" "${LEGACY_DIR}/luascripts/"
-    done
+    # Copy luascripts
+    cp -r "${SETTINGS_BASE}/luascripts/." "${LEGACY_DIR}/luascripts/"
     
     for commandmap in "${SETTINGS_BASE}/commandmaps/"*.pk3; do
         safe_copy "$commandmap" "${LEGACY_DIR}/"
