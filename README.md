@@ -111,23 +111,22 @@ SVETLTVMAXSLAVES      | Maximum allowed ETLTV Server slaves | ``2``
 SVETLTVPASSWORD       | Password used by ETLTV slaves to connect | ```3tltv```
 TIMEOUTLIMIT          | Maximum number of pauses per map side | ``1``
 SERVERCONF            | Server config to load on startup | ``legacy6``
-STATS_SUBMIT          | Submit match reports using game-stats-web.lua at end of every round | ``false`` 
-STATS_API_TOKEN       | API Token to be used in request | ``None``
-STATS_API_PATH        | Path to to save logfile to     | `/legacy/homepath/legacy/stats/`
-STATS_API_URL_SUBMIT  | Sets endpoint for the API to SUBMIT match_report to | ``None``
-STATS_API_URL_MATCHID | Gather Automation. Will fetch matchID from specified base_url/server_ip/server_port endpoint | ``None``
-STATS_API_DUMPJSON    | Debug, dump stats json to file before sending | ``false``
-STATS_API_OBJDEBUG    | Debug, print debug logs in STATS_API_LOG for objective related events | ``false``
-STATS_API_LOG         | Enable logging in game-stats-web.lua | ``false``
-STATS_API_OBITUARIES  | Collect and submit Obituaries in json report  | ``true``
-STATS_API_DAMAGESTAT  | Collect and submit damage events in json report | ``false``
-STATS_API_OBJSTATS    | Collect and submit objective stats in json report | ``true``
-STATS_API_MESSAGELOG  | Collect and submit server messages in json report | ``false``
-STATS_API_SHOVESTATS  | Collect and submit shove stats in json report | ``true``
-STATS_API_MOVEMENTSTATS | Collect and submit movement stats in json report | ``true``
-STATS_API_STANCESTATS | Collect and submit stance stats in json report | ``true``
-STATS_API_ALTMAPSCRIPTS | Enable alternative map scripts (bobika mapscripts) | ``false``
-STATS_API_FORCERENAME | Force player name standardization | ``false``
+STATS_SUBMIT            | Enable stats collection and submission at round end | ``false``
+STATS_API_TOKEN         | API bearer token for submission requests | ``None``
+STATS_API_URL_SUBMIT    | Endpoint to POST the match report JSON to | ``None``
+STATS_API_URL_MATCHID   | Endpoint to fetch match ID from (`<base>/<server_ip>/<port>`) | ``None``
+STATS_API_PATH          | Directory path for local JSON dumps and log file | `/legacy/homepath/legacy/stats/`
+STATS_API_LOG           | Enable stats log file | ``false``
+STATS_API_LOG_LEVEL     | Log verbosity: `info` or `debug` | ``info``
+STATS_API_DUMPJSON      | Write indented JSON to `STATS_API_PATH` at round end | ``false``
+STATS_API_GAMELOG       | Collect in-round event timeline (kills, damage, objectives, etc.) | ``true``
+STATS_API_OBJSTATS      | Collect objective stats per player | ``true``
+STATS_API_SHOVESTATS    | Collect shove events | ``true``
+STATS_API_MOVEMENTSTATS | Collect movement distance stats | ``true``
+STATS_API_STANCESTATS   | Collect stance time stats (prone, crouch, sprint, etc.) | ``true``
+STATS_API_WEAPON_FIRE   | Collect every weapon fire event (very high volume, not recommended) | ``false``
+STATS_API_FORCERENAME   | Enforce team roster player names via API | ``false``
+STATS_API_VERSION_CHECK | Check for gamestats module updates on round start | ``true``
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
 configuration at `/legacy/server/extra.cfg`.
