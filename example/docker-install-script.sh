@@ -1666,32 +1666,6 @@ add_watchtower_service() {
 EOL
 }
 
-configure_auto_restart() {
-    show_header
-    print_section_header "Automatic Server Restart Configuration" "(Can be changed later)"
-    log "info" "Adds a cron job to the $SELECTED_USER account. Scheduling can be changed manually from the default 2 hours"
-    echo
-    log "prompt" "About Automatic Restarts"
-    log "" "  • Helps maintain server performance"
-    log "" "  • Clears memory leaks"
-    log "" "  • Ensures smooth operation"
-    log "" "  • Only restarts when server is empty"
-    echo
-    echo
-    
-    read -p "Would you like to enable automatic server restarts every 2 hours? (Y/n): " ENABLE_RESTART
-    if [[ ! $ENABLE_RESTART =~ ^[Nn]$ ]]; then
-        for i in $(seq 1 $INSTANCES); do
-            su - "$SELECTED_USER" -c "(crontab -l 2>/dev/null; echo \"0 */2 * * * docker exec etl-server$i ./autorestart\") | crontab -"
-        done
-        log "success" "Automatic restart cron jobs have been added for user $SELECTED_USER"
-    else
-        log "info" "Automatic restarts will not be enabled"
-    fi
-    
-    sleep 2
-    return 0
-}
 
 # Map all instance settings to docker-compose environment
 map_instance_settings() {
@@ -2304,7 +2278,6 @@ main() {
     setup_stats_variables
     configure_server_instances
     configure_server_settings "$INSTANCES"
-    configure_auto_restart || true 
     configure_watchtower
     configure_webserver
 

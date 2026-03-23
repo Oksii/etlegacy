@@ -1,4 +1,4 @@
-# Build stage
+# Build stage: ET base files, configs, and ET Legacy binary
 FROM debian:stable-slim AS builder
 
 RUN apt-get update && \
@@ -9,10 +9,9 @@ RUN apt-get update && \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Second layer: ET base files
 WORKDIR /legacy/server
-RUN mkdir -p etmain/mapscripts && \
-    mkdir -p /legacy/server/etmain && \
+
+RUN mkdir -p etmain/mapscripts legacy && \
     curl -SL "https://cdn.splashdamage.com/downloads/games/wet/et260b.x86_full.zip" -o /tmp/et_full.zip && \
     cd /tmp && \
     unzip -q et_full.zip && \
@@ -21,16 +20,14 @@ RUN mkdir -p etmain/mapscripts && \
     cp /tmp/etmain/pak*.pk3 /legacy/server/etmain/ && \
     rm -rf /tmp/et_full.zip /tmp/et260b.x86_keygen_V03.run /tmp/etmain
 
-# Config files
 RUN git clone --depth 1 --single-branch "https://github.com/Oksii/legacy-configs.git" settings && \
     mkdir -p /legacy/homepath
 
-# ET Legacy files
+# ETLegacy
 ARG STATIC_URL_AMD64
 ARG STATIC_URL_ARM64
 ARG TARGETARCH
 
-# Download and extract the correct version based on architecture
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         echo "Downloading ARM64 version..." && \
         curl -SL "${STATIC_URL_ARM64}" | tar xz --strip-components=1; \
@@ -41,41 +38,42 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
     mv etlded.$(arch) etlded && \
     mv etlded_bot.$(arch).sh etlded_bot.sh
 
-COPY --chmod=755 entrypoint.sh ./start
-COPY --chmod=755 autorestart.sh ./autorestart
+# Go build stage: compile entrypoint and autorestart binaries
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS go-builder
+
+WORKDIR /build
+
+COPY go.mod .
+COPY src/ src/
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -o start ./src/entrypoint/ && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -o autorestart ./src/autorestart/
 
 # Final stage
 FROM debian:stable-slim
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        wget \
         git \
-        qstat \
         curl \
         ca-certificates \
-        parallel \
-    && if [ "$(arch)" = "aarch64" ]; then \
-        wget -q https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_arm -O /bin/icecon; \
-    else \
-        wget -q https://github.com/icedream/icecon/releases/download/v1.0.0/icecon_linux_amd64 -O /bin/icecon; \
-    fi \
-    && chmod +x /bin/icecon \
-    && mkdir -p /legacy/server/legacy \
-    && wget -q https://raw.githubusercontent.com/LuaDist/dkjson/master/dkjson.lua -O /legacy/server/legacy/dkjson.lua \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -Ms /bin/bash legacy
 
-# Copy files from builder
 COPY --from=builder --chown=legacy:legacy /legacy /legacy/
+COPY --chown=legacy:legacy vendor/dkjson.lua /legacy/server/legacy/dkjson.lua
+COPY --from=go-builder --chmod=755 --chown=legacy:legacy /build/start /legacy/server/start
+COPY --from=go-builder --chmod=755 --chown=legacy:legacy /build/autorestart /legacy/server/autorestart
 
-# Configure volumes and working directory
 VOLUME ["/legacy/homepath", "/legacy/server/etmain"]
 WORKDIR /legacy/server
 
-# Expose port and set user
-EXPOSE 27960/UDP
+EXPOSE 27960/udp
 USER legacy
 
-# Set entrypoint
 ENTRYPOINT ["./start"]

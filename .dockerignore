@@ -1,7 +1,9 @@
-# Ignore all files except Dockerfiles and entrypoint.sh
+# Ignore all files except build inputs
 *
 !Dockerfile.stable
 !Dockerfile.latest
-!entrypoint.sh
-!autorestart.sh
+!go.mod
+!go.sum
+!src/
+!vendor/
 !README.md

@@ -22,11 +22,7 @@ By default this is [legacy-configs](https://github.com/Oksii/legacy-configs)
 - Tag `stable` is recommended for competitive play and actively maintained. 
 - Automatic builds triggered by [ET:Legacy snapshot](https://www.etlegacy.com/workflow-files) releases
 - Available tags listed on [Docker Hub](https://hub.docker.com/r/oksii/etlegacy)
-- Includes `autorestart.sh` for performance maintenance. Will check for active players before restarting:
-  ```bash
-  # Example cron setup
-  0 */2 * * * docker exec etl-server ./autorestart
-  ```
+- Includes a built-in `autorestart` daemon that periodically checks player count and sends a restart signal when the server is empty (or below the configured threshold). Enabled by default, runs every 2 hours. Can also be invoked as a one-shot command (e.g. via Watchtower lifecycle hook).
 # Usage
 ## docker-compose (Recommended)
 ```yaml
@@ -84,6 +80,7 @@ Environment Variable  | Description                    | Defaults
 --------------------- | ------------------------------ | ------------------------
 REDIRECTURL           | URL of HTTP downloads          | ``https://dl.etl.lol/maps/et``
 MAP_PORT              | Container port (internal)      | ``27960``
+MAP_IP                | Override the server's public IP reported to stats APIs. Auto-detected via ipify if unset. | ``None``
 MAXCLIENTS            | Maximum number of players      | ``32``
 AUTO_UPDATE           | Update configurations on restart? | ``true``
 SVTRACKER             | Set sv_tracker endpoint, defaults to ``et.trackbase.net:4444`` via ETL defaults, if none is set. | ``None``
@@ -93,7 +90,10 @@ SETTINGSURL           | The git URL (must be HTTP public) for the ETL settings r
 SETTINGSPAT           | Github PAT token for private repos | ``None``
 SETTINGSBRANCH        | The git branch for the ETL settings repository. | ``main``
 ADDITIONAL_CLI_ARGS   | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | ``None``
-
+OMNIBOT               | Enable Omnibot AI. `0` = disabled, `1` = enabled | ``0``
+AUTORESTART           | Enable the built-in autorestart daemon | ``true``
+AUTORESTART_INTERVAL  | How often (in minutes) the daemon checks whether to restart. Set to `0` to disable the daemon | ``120``
+AUTORESTART_PLAYERS   | Maximum number of active players that still allows a restart. `0` = only restart when completely empty | ``0``
 
 ## Configuration parameters for the default `SETTINGSURL`
 Environment Variable  | Description                    | Defaults
@@ -109,7 +109,6 @@ CONF_MOTD             | MOTD line on connect. Use `\n` to indicate a new line or
 SVAUTODEMO            | Enable/Disable autodemo record. 0 (off), 1 (on), 2 (only active with players) | ``0``
 SVETLTVMAXSLAVES      | Maximum allowed ETLTV Server slaves | ``2``
 SVETLTVPASSWORD       | Password used by ETLTV slaves to connect | ```3tltv```
-TIMEOUTLIMIT          | Maximum number of pauses per map side | ``1``
 SERVERCONF            | Server config to load on startup | ``legacy6``
 STATS_SUBMIT            | Enable stats collection and submission at round end | ``false``
 STATS_API_TOKEN         | API bearer token for submission requests | ``None``
@@ -135,8 +134,9 @@ possible or create a custom `SETTINGSURL`.
 
 # Further examples: 
 ## watchtower integration
-Automatic updates and restarts, ensuring servers are only restarted with no players are present.
+Automatic updates and restarts, ensuring servers are only restarted when no players are present.
 By using watchtower's ``--enable-lifecycle-hooks`` and adding the following labels to your ET:L service.
+The `autorestart` binary runs in one-shot mode when invoked as a lifecycle hook: it exits `0` (proceed with update) only if the player count is at or below `AUTORESTART_PLAYERS`, otherwise exits `1` (abort).
 
 ````yaml
   labels:
