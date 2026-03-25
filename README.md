@@ -124,7 +124,9 @@ STATS_API_SHOVESTATS    | Collect shove events | ``true``
 STATS_API_MOVEMENTSTATS | Collect movement distance stats | ``true``
 STATS_API_STANCESTATS   | Collect stance time stats (prone, crouch, sprint, etc.) | ``true``
 STATS_API_WEAPON_FIRE   | Collect every weapon fire event (very high volume, not recommended) | ``false``
-STATS_API_FORCERENAME   | Enforce team roster player names via API | ``false``
+STATS_AUTO_RENAME       | (Gather only) Enforce team roster player names from gather API | ``false``
+STATS_AUTO_SORT         | (Gather only) Auto-assign players to their gather teams on connect | ``false``
+STATS_AUTO_START        | (Gather only) Automatically ready-up all players when gather teams are full | ``false``
 STATS_API_VERSION_CHECK | Check for gamestats module updates on round start | ``true``
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
