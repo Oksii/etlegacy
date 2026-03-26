@@ -124,10 +124,18 @@ STATS_API_SHOVESTATS    | Collect shove events | ``true``
 STATS_API_MOVEMENTSTATS | Collect movement distance stats | ``true``
 STATS_API_STANCESTATS   | Collect stance time stats (prone, crouch, sprint, etc.) | ``true``
 STATS_API_WEAPON_FIRE   | Collect every weapon fire event (very high volume, not recommended) | ``false``
-STATS_AUTO_RENAME       | (Gather only) Enforce team roster player names from gather API | ``false``
-STATS_AUTO_SORT         | (Gather only) Auto-assign players to their gather teams on connect | ``false``
-STATS_AUTO_START        | (Gather only) Automatically ready-up all players when gather teams are full | ``false``
-STATS_API_VERSION_CHECK | Check for gamestats module updates on round start | ``true``
+STATS_AUTO_RENAME            | (Gather only) Enforce team roster player names from gather API | ``false``
+STATS_AUTO_SORT              | (Gather only) Auto-assign players to their gather teams on connect | ``false``
+STATS_AUTO_START             | (Gather only) Automatically ready-up all players when gather teams are full | ``false``
+STATS_AUTO_MAP               | (Gather only) Switch to next map in rotation after round 2 intermission | ``false``
+STATS_AUTO_START_WAIT_INITIAL | (Gather only) Seconds before force-start on map 1 round 1 | ``420``
+STATS_AUTO_START_WAIT        | (Gather only) Seconds before force-start on all subsequent rounds | ``180``
+STATS_AUTO_CONFIG_2          | (Gather only) Server config applied for ≤2-player matches (e.g. `legacy1`) | ``legacy1``
+STATS_AUTO_CONFIG_4          | (Gather only) Server config applied for ≤4-player matches | ``legacy3``
+STATS_AUTO_CONFIG_6          | (Gather only) Server config applied for ≤6-player matches | ``legacy3``
+STATS_AUTO_CONFIG_10         | (Gather only) Server config applied for ≤10-player matches | ``legacy5``
+STATS_AUTO_CONFIG_12         | (Gather only) Server config applied for ≤12-player matches | ``legacy6``
+STATS_API_VERSION_CHECK      | Check for gamestats module updates on round start | ``true``
 
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
 configuration at `/legacy/server/extra.cfg`.
