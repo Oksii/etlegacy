@@ -33,44 +33,56 @@ func getenv(key, def string) string {
 
 func loadConf() map[string]string {
 	conf := map[string]string{
-		"HOSTNAME":                getenv("HOSTNAME", "ETL Docker Server"),
-		"MAP_PORT":                getenv("MAP_PORT", "27960"),
-		"MAP_IP":                  getenv("MAP_IP", ""),
-		"REDIRECTURL":             getenv("REDIRECTURL", "https://dl.etl.lol/maps/et"),
-		"MAXCLIENTS":              getenv("MAXCLIENTS", "32"),
-		"STARTMAP":                getenv("STARTMAP", "radar"),
-		"SERVERCONF":              getenv("SERVERCONF", "legacy6"),
-		"SVTRACKER":               getenv("SVTRACKER", ""),
-		"MOTD":                    getenv("CONF_MOTD", ""),
-		"PASSWORD":                getenv("PASSWORD", ""),
-		"RCONPASSWORD":            getenv("RCONPASSWORD", ""),
-		"REFPASSWORD":             getenv("REFPASSWORD", ""),
-		"SCPASSWORD":              getenv("SCPASSWORD", ""),
-		"SVAUTODEMO":              getenv("SVAUTODEMO", "0"),
-		"ETLTVMAXSLAVES":          getenv("SVETLTVMAXSLAVES", "2"),
-		"ETLTVPASSWORD":           getenv("SVETLTVPASSWORD", "3tltv"),
-		"SETTINGSURL":             getenv("SETTINGSURL", "https://github.com/Oksii/legacy-configs.git"),
-		"SETTINGSPAT":             getenv("SETTINGSPAT", ""),
-		"SETTINGSBRANCH":          getenv("SETTINGSBRANCH", "main"),
-		"STATS_SUBMIT":            getenv("STATS_SUBMIT", "false"),
-		"STATS_API_TOKEN":         getenv("STATS_API_TOKEN", ""),
-		"STATS_API_PATH":          getenv("STATS_API_PATH", "/legacy/homepath/legacy/stats/"),
-		"STATS_API_URL_SUBMIT":    getenv("STATS_API_URL_SUBMIT", ""),
-		"STATS_API_URL_MATCHID":   getenv("STATS_API_URL_MATCHID", ""),
-		"STATS_API_LOG":           getenv("STATS_API_LOG", "false"),
-		"STATS_API_LOG_LEVEL":     getenv("STATS_API_LOG_LEVEL", "info"),
-		"STATS_API_GAMELOG":       getenv("STATS_API_GAMELOG", "true"),
-		"STATS_API_OBJSTATS":      getenv("STATS_API_OBJSTATS", "true"),
-		"STATS_API_SHOVESTATS":    getenv("STATS_API_SHOVESTATS", "true"),
-		"STATS_API_MOVEMENTSTATS": getenv("STATS_API_MOVEMENTSTATS", "true"),
-		"STATS_API_STANCESTATS":   getenv("STATS_API_STANCESTATS", "true"),
-		"STATS_API_WEAPON_FIRE":   getenv("STATS_API_WEAPON_FIRE", "false"),
-		"STATS_API_DUMPJSON":      getenv("STATS_API_DUMPJSON", "false"),
-		"STATS_API_FORCERENAME":   getenv("STATS_API_FORCERENAME", "false"),
-		"STATS_API_VERSION_CHECK": getenv("STATS_API_VERSION_CHECK", "true"),
-		"ASSETS":                  getenv("ASSETS", "false"),
-		"ASSETS_URL":              getenv("ASSETS_URL", ""),
-		"OMNIBOT":                 getenv("OMNIBOT", "0"),
+		"HOSTNAME":                		 getenv("HOSTNAME", "ETL Docker Server"),
+		"MAP_PORT":                		 getenv("MAP_PORT", "27960"),
+		"MAP_IP":                  		 getenv("MAP_IP", ""),
+		"REDIRECTURL":             		 getenv("REDIRECTURL", "https://dl.etl.lol/maps/et"),
+		"MAXCLIENTS":              		 getenv("MAXCLIENTS", "24"),
+		"STARTMAP":                		 getenv("STARTMAP", "radar"),
+		"SERVERCONF":              		 getenv("SERVERCONF", "legacy6"),
+		"SVTRACKER":               		 getenv("SVTRACKER", ""),
+		"MOTD":                    		 getenv("CONF_MOTD", ""),
+		"PASSWORD":                		 getenv("PASSWORD", ""),
+		"RCONPASSWORD":            		 getenv("RCONPASSWORD", ""),
+		"REFPASSWORD":             		 getenv("REFPASSWORD", ""),
+		"SCPASSWORD":              		 getenv("SCPASSWORD", ""),
+		"SVAUTODEMO":              		 getenv("SVAUTODEMO", "0"),
+		"ETLTVMAXSLAVES":          		 getenv("SVETLTVMAXSLAVES", "2"),
+		"ETLTVPASSWORD":           		 getenv("SVETLTVPASSWORD", "3tltv"),
+		"SETTINGSURL":             		 getenv("SETTINGSURL", "https://github.com/Oksii/legacy-configs.git"),
+		"SETTINGSPAT":             		 getenv("SETTINGSPAT", ""),
+		"SETTINGSBRANCH":          		 getenv("SETTINGSBRANCH", "main"),
+		"STATS_SUBMIT":            		 getenv("STATS_SUBMIT", "false"),
+		"STATS_API_TOKEN":         		 getenv("STATS_API_TOKEN", "GameStatsWebLuaToken"),
+		"STATS_API_PATH":          		 getenv("STATS_API_PATH", "/legacy/homepath/legacy/stats/"),
+		"STATS_API_URL_SUBMIT":    		 getenv("STATS_API_URL_SUBMIT", "https://api.etl.lol/api/v2/stats/etl/matches/stats/submit"),
+		"STATS_API_URL_MATCHID":   		 getenv("STATS_API_URL_MATCHID", "https://api.etl.lol/api/v2/stats/etl/match-manager"),
+		"STATS_API_LOG":           		 getenv("STATS_API_LOG", "false"),
+		"STATS_API_LOG_LEVEL":     		 getenv("STATS_API_LOG_LEVEL", "info"),
+		"STATS_API_GAMELOG":       		 getenv("STATS_API_GAMELOG", "true"),
+		"STATS_API_OBJSTATS":      		 getenv("STATS_API_OBJSTATS", "true"),
+		"STATS_API_SHOVESTATS":    		 getenv("STATS_API_SHOVESTATS", "true"),
+		"STATS_API_MOVEMENTSTATS": 		 getenv("STATS_API_MOVEMENTSTATS", "true"),
+		"STATS_API_STANCESTATS":   		 getenv("STATS_API_STANCESTATS", "true"),
+		"STATS_API_WEAPON_FIRE":         getenv("STATS_API_WEAPON_FIRE", "false"),
+		"STATS_API_DUMPJSON":            getenv("STATS_API_DUMPJSON", "false"),
+		"STATS_API_VERSION_CHECK":       getenv("STATS_API_VERSION_CHECK", "true"),
+		"STATS_AUTO_RENAME":             getenv("STATS_AUTO_RENAME", "false"),
+		"STATS_AUTO_SORT":               getenv("STATS_AUTO_SORT", "false"),
+		"STATS_AUTO_START":              getenv("STATS_AUTO_START", "false"),
+		"STATS_AUTO_MAP":                getenv("STATS_AUTO_MAP", "false"),
+		"STATS_AUTO_CONFIG":             getenv("STATS_AUTO_CONFIG", "false"),
+		"STATS_GATHER_FEATURES":         getenv("STATS_GATHER_FEATURES", "false"),
+		"STATS_AUTO_CONFIG_2":           getenv("STATS_AUTO_CONFIG_2", "legacy1"),
+		"STATS_AUTO_CONFIG_4":           getenv("STATS_AUTO_CONFIG_4", "legacy3"),
+		"STATS_AUTO_CONFIG_6":           getenv("STATS_AUTO_CONFIG_6", "legacy3"),
+		"STATS_AUTO_CONFIG_10":          getenv("STATS_AUTO_CONFIG_10", "legacy5"),
+		"STATS_AUTO_CONFIG_12":          getenv("STATS_AUTO_CONFIG_12", "legacy6"),
+		"STATS_AUTO_START_WAIT_INITIAL": getenv("STATS_AUTO_START_WAIT_INITIAL", "420"),
+		"STATS_AUTO_START_WAIT":         getenv("STATS_AUTO_START_WAIT", "180"),
+		"ASSETS":                  		 getenv("ASSETS", "false"),
+		"ASSETS_URL":              		 getenv("ASSETS_URL", ""),
+		"OMNIBOT":                 		 getenv("OMNIBOT", "0"),
 	}
 
 	if conf["STATS_SUBMIT"] == "true" && conf["SETTINGSBRANCH"] == "main" {
@@ -429,6 +441,14 @@ func main() {
 	}
 
 	conf := loadConf()
+
+	// Inject conf defaults into the process environment so that values not
+	// explicitly set by the user are visible to Lua via os.getenv().
+	for k, v := range conf {
+		if os.Getenv(k) == "" {
+			os.Setenv(k, v)
+		}
+	}
 
 	if getenv("AUTO_UPDATE", "true") == "true" {
 		updateConfigs(conf)
