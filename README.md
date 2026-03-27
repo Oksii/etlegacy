@@ -139,6 +139,27 @@ STATS_AUTO_CONFIG_10         | (Gather only) Server config applied for ≤10-pla
 STATS_AUTO_CONFIG_12         | (Gather only) Server config applied for ≤12-player matches | ``legacy6``
 STATS_API_VERSION_CHECK      | Check for gamestats module updates on round start | ``true``
 
+## Configuration parameters for `combinedfixes.lua`
+Environment Variable      | Description                    | Defaults
+------------------------- | ------------------------------ | ------------------------
+CF_DEFAULT_CLASS          | Force players to Medic on team join if no class is selected (effectively bans Soldier SMG) | ``true``
+CF_GUID_BLOCKER           | Enable the GUID blocker — moves matching players to spectator during warmup | ``true``
+CF_GUID_BLOCKER_TARGETS   | Comma-separated list of GUIDs to block during warmup (merged with any hardcoded in source) | ``F2ECF20F3ED6A5A93F2C49EF239F4488``
+CF_TECH_PAUSE             | Enable the `techpause` / `tp` and `techunpause` / `tup` commands | ``true``
+CF_TECH_PAUSE_LENGTH      | Timeout (seconds) for a tech pause | ``600``
+CF_TECH_PAUSE_COUNT       | Number of tech pauses allowed per team per half | ``1``
+CF_PAUSE_LENGTH           | Timeout (seconds) for a regular pause | ``120``
+CF_TEAM_LOCK              | Lock teams on round start in stopwatch; re-locks after unpause | ``true``
+CF_COMMAND_LOGGING        | Log `callvote`, `vote`, and `ref` commands to the log file | ``true``
+CF_COMMAND_LOG_VOTES      | Log `callvote` / `vote` commands (requires `CF_COMMAND_LOGGING=true`) | ``true``
+CF_COMMAND_LOG_REF        | Log `ref` commands (requires `CF_COMMAND_LOGGING=true`) | ``true``
+CF_SPAWN_INVUL_SECONDS    | Spawn shield duration in seconds (only active for configs containing `1on1`) | ``1``
+CF_BAN_REASON             | Rejection message shown to banned players | ``Banned.``
+CF_LOG_FILEPATH           | Override the log file path. Auto-detected (`<fs_homepath>/legacy/combinedfixes.log`) when empty | ``None``
+CF_BANNED_GUIDS           | Comma-separated list of GUIDs rejected at connect (e.g. `AABBCC...,DDEEFF...`) | ``None``
+CF_BANNED_IPS             | Comma-separated list of IPs or prefixes rejected at connect (e.g. `1.2.3.4,10.0.0.`) | ``None``
+CF_VOTE_BANNED_GUIDS      | Comma-separated list of GUIDs blocked from calling votes | ``None``
+
 Extra configuration can be prepended to the `etl_server.cfg` by mounting a
 configuration at `/legacy/server/extra.cfg`.
 This is generally not recommended, try to use the variables above where
