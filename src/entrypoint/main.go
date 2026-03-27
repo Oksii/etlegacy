@@ -84,6 +84,19 @@ func loadConf() map[string]string {
 		conf["SETTINGSBRANCH"] = "etl-stats-api"
 	}
 
+	// Mirror stats.lua: STATS_GATHER_FEATURES=true enables all individual gather flags,
+	// but only when the user has not explicitly set an individual flag themselves.
+	if conf["STATS_GATHER_FEATURES"] == "true" {
+		for _, k := range []string{
+			"STATS_AUTO_RENAME", "STATS_AUTO_SORT", "STATS_AUTO_START",
+			"STATS_AUTO_MAP", "STATS_AUTO_CONFIG",
+		} {
+			if os.Getenv(k) == "" {
+				conf[k] = "true"
+			}
+		}
+	}
+
 	// Overlay any CONF_* environment variables, allowing users to substitute
 	// arbitrary %CONF_FOO% placeholders in etl_server.cfg by setting CONF_FOO=value.
 	for _, env := range os.Environ() {
