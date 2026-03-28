@@ -57,6 +57,7 @@ func loadConf() map[string]string {
 		"STATS_API_PATH":          		 getenv("STATS_API_PATH", "/legacy/homepath/legacy/stats/"),
 		"STATS_API_URL_SUBMIT":    		 getenv("STATS_API_URL_SUBMIT", "https://api.etl.lol/api/v2/stats/etl/matches/stats/submit"),
 		"STATS_API_URL_MATCHID":   		 getenv("STATS_API_URL_MATCHID", "https://api.etl.lol/api/v2/stats/etl/match-manager"),
+		"STATS_API_URL_VERSION":   		 getenv("STATS_API_URL_VERSION", "https://api.etl.lol/api/v2/stats/etl/matches/stats/version"),
 		"STATS_API_LOG":           		 getenv("STATS_API_LOG", "false"),
 		"STATS_API_LOG_LEVEL":     		 getenv("STATS_API_LOG_LEVEL", "info"),
 		"STATS_API_GAMELOG":       		 getenv("STATS_API_GAMELOG", "true"),
@@ -90,6 +91,7 @@ func loadConf() map[string]string {
 		"STATS_AUTO_CONFIG_6":           getenv("STATS_AUTO_CONFIG_6", "legacy3"),
 		"STATS_AUTO_CONFIG_10":          getenv("STATS_AUTO_CONFIG_10", "legacy5"),
 		"STATS_AUTO_CONFIG_12":          getenv("STATS_AUTO_CONFIG_12", "legacy6"),
+		"STATS_AUTO_SCORES":             getenv("STATS_AUTO_SCORES", "false"),
 		"STATS_AUTO_START_WAIT_INITIAL": getenv("STATS_AUTO_START_WAIT_INITIAL", "420"),
 		"STATS_AUTO_START_WAIT":         getenv("STATS_AUTO_START_WAIT", "180"),
 		"ASSETS":                  		 getenv("ASSETS", "false"),
@@ -106,7 +108,7 @@ func loadConf() map[string]string {
 	if conf["STATS_GATHER_FEATURES"] == "true" {
 		for _, k := range []string{
 			"STATS_AUTO_RENAME", "STATS_AUTO_SORT", "STATS_AUTO_START",
-			"STATS_AUTO_MAP", "STATS_AUTO_CONFIG",
+			"STATS_AUTO_MAP", "STATS_AUTO_CONFIG", "STATS_AUTO_SCORES",
 		} {
 			if os.Getenv(k) == "" {
 				conf[k] = "true"

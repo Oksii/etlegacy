@@ -110,10 +110,13 @@ SVAUTODEMO            | Enable/Disable autodemo record. 0 (off), 1 (on), 2 (only
 SVETLTVMAXSLAVES      | Maximum allowed ETLTV Server slaves | ``2``
 SVETLTVPASSWORD       | Password used by ETLTV slaves to connect | ```3tltv```
 SERVERCONF            | Server config to load on startup | ``legacy6``
+
+## Configuration parameters for `stats.lua`
 STATS_SUBMIT            | Enable stats collection and submission at round end | ``false``
 STATS_API_TOKEN         | API bearer token for submission requests | ``None``
 STATS_API_URL_SUBMIT    | Endpoint to POST the match report JSON to | ``None``
 STATS_API_URL_MATCHID   | Endpoint to fetch match ID from (`<base>/<server_ip>/<port>`) | ``None``
+STATS_API_URL_VERSION   | Endpoint for stats module version checks | ``None``
 STATS_API_PATH          | Directory path for local JSON dumps and log file | `/legacy/homepath/legacy/stats/`
 STATS_API_LOG           | Enable stats log file | ``false``
 STATS_API_LOG_LEVEL     | Log verbosity: `info` or `debug` | ``info``
@@ -124,12 +127,13 @@ STATS_API_SHOVESTATS    | Collect shove events | ``true``
 STATS_API_MOVEMENTSTATS | Collect movement distance stats | ``true``
 STATS_API_STANCESTATS   | Collect stance time stats (prone, crouch, sprint, etc.) | ``true``
 STATS_API_WEAPON_FIRE   | Collect every weapon fire event (very high volume, not recommended) | ``false``
-STATS_GATHER_FEATURES        | (Gather only) Enable all gather features at once (rename, sort, start, map, config). Overrides individual flags when ``true`` | ``false``
+STATS_GATHER_FEATURES        | (Gather only) Enable all gather features at once (rename, sort, start, map, config, scores). Overrides individual flags when ``true`` | ``false``
 STATS_AUTO_RENAME            | (Gather only) Enforce team roster player names from gather API | ``false``
 STATS_AUTO_SORT              | (Gather only) Auto-assign players to their gather teams on connect | ``false``
 STATS_AUTO_START             | (Gather only) Automatically ready-up all players when gather teams are full | ``false``
 STATS_AUTO_MAP               | (Gather only) Switch to next map in rotation after round 2 intermission | ``false``
 STATS_AUTO_CONFIG            | (Gather only) Apply server config based on roster player count at match start | ``false``
+STATS_AUTO_SCORES            | (Gather only) Track match scores across a best-of-3 series; embeds score state into each stats submission | ``false``
 STATS_AUTO_START_WAIT_INITIAL | (Gather only) Seconds before force-start on map 1 round 1 | ``420``
 STATS_AUTO_START_WAIT        | (Gather only) Seconds before force-start on all subsequent rounds | ``180``
 STATS_AUTO_CONFIG_2          | (Gather only) Server config applied for ≤2-player matches (e.g. `legacy1`) | ``legacy1``
