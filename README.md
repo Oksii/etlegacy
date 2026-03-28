@@ -112,6 +112,8 @@ SVETLTVPASSWORD       | Password used by ETLTV slaves to connect | ```3tltv```
 SERVERCONF            | Server config to load on startup | ``legacy6``
 
 ## Configuration parameters for `stats.lua`
+Environment Variable  | Description                    | Defaults
+--------------------- | ------------------------------ | ------------------------
 STATS_SUBMIT            | Enable stats collection and submission at round end | ``false``
 STATS_API_TOKEN         | API bearer token for submission requests | ``None``
 STATS_API_URL_SUBMIT    | Endpoint to POST the match report JSON to | ``None``
