@@ -41,6 +41,7 @@ func loadConf() map[string]string {
 		"STARTMAP":                		 getenv("STARTMAP", "radar"),
 		"SERVERCONF":              		 getenv("SERVERCONF", "legacy6"),
 		"SVTRACKER":               		 getenv("SVTRACKER", ""),
+		"ADVERT":                  		 getenv("ADVERT", "0"),
 		"MOTD":                    		 getenv("CONF_MOTD", ""),
 		"PASSWORD":                		 getenv("PASSWORD", ""),
 		"RCONPASSWORD":            		 getenv("RCONPASSWORD", ""),
@@ -127,6 +128,11 @@ func loadConf() map[string]string {
 		if len(parts) == 2 {
 			conf[key] = parts[1]
 		}
+	}
+
+	// ADVERT: escalate to 2 (tracker) when SVTRACKER is set, unless user explicitly provided ADVERT.
+	if conf["SVTRACKER"] != "" && os.Getenv("ADVERT") == "" {
+		conf["ADVERT"] = "2"
 	}
 
 	return conf

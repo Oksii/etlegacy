@@ -84,6 +84,7 @@ MAP_IP                | Override the server's public IP reported to stats APIs. 
 MAXCLIENTS            | Maximum number of players      | ``32``
 AUTO_UPDATE           | Update configurations on restart? | ``true``
 SVTRACKER             | Set sv_tracker endpoint, defaults to ``et.trackbase.net:4444`` via ETL defaults, if none is set. | ``None``
+ADVERT                | `sv_advert`: `0`=none, `1`=master server, `2`=tracker. Auto-set to `2` when `SVTRACKER` is set, otherwise `0`. | ``auto``
 ASSETS                | Download optional assets to ``./legacy`` dir. e.g ``zzz_levelshots.pk3``. | ``false`` 
 ASSETS_URL            | Provide direct link URL to download assets.pk3 | ``None`` 
 SETTINGSURL           | The git URL (must be HTTP public) for the ETL settings repository. | ``https://github.com/Oksii/legacy-configs.git``
