@@ -7,8 +7,9 @@ their defaults (refer below).
 
 If you want to avoid downloading maps over HTTP(s), you can mount a volume of
 maps to `/maps/`.
-The container will first try to copy from pk3s from this directory before
-attempting an HTTP(s) download.
+By default all `.pk3` files found in `/maps/` are automatically copied into
+the server — no need to list them in `MAPS`. Set `MAPS_AUTO=false` to disable
+auto-scanning and rely on explicit `MAPS` entries only.
 
 All logs are written to STDOUT so can be viewed from `docker logs` or run
 without the `-d` Docker run switch.
@@ -92,6 +93,7 @@ SETTINGSPAT           | Github PAT token for private repos | ``None``
 SETTINGSBRANCH        | The git branch for the ETL settings repository. | ``main``
 ADDITIONAL_CLI_ARGS   | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | ``None``
 OMNIBOT               | Enable Omnibot AI. `0` = disabled, `1` = enabled | ``0``
+MAPS_AUTO             | Auto-copy all `.pk3` files from the `/maps` volume without requiring `MAPS=` | ``true``
 AUTORESTART           | Enable the built-in autorestart daemon | ``true``
 AUTORESTART_INTERVAL  | How often (in minutes) the daemon checks whether to restart. Set to `0` to disable the daemon | ``120``
 AUTORESTART_PLAYERS   | Maximum number of active players that still allows a restart. `0` = only restart when completely empty | ``0``

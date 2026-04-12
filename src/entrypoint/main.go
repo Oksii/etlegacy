@@ -98,6 +98,7 @@ func loadConf() map[string]string {
 		"ASSETS":                  		 getenv("ASSETS", "false"),
 		"ASSETS_URL":              		 getenv("ASSETS_URL", ""),
 		"OMNIBOT":                 		 getenv("OMNIBOT", "0"),
+		"MAPS_AUTO":               		 getenv("MAPS_AUTO", "true"),
 	}
 
 	if conf["STATS_SUBMIT"] == "true" && conf["SETTINGSBRANCH"] == "main" {
@@ -179,16 +180,47 @@ func dlFmtBytes(n int64) string {
 	}
 }
 
-func downloadMaps(conf map[string]string) {
-	mapsEnv := os.Getenv("MAPS")
-	if mapsEnv == "" {
-		return
+func scanLocalMapVolume() []string {
+	entries, err := os.ReadDir("/maps")
+	if err != nil {
+		return nil
 	}
-	var toDownload []string
-	for _, m := range strings.Split(mapsEnv, ":") {
-		if m = strings.TrimSpace(m); m == "" {
+	var maps []string
+	for _, e := range entries {
+		if e.IsDir() {
 			continue
 		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".pk3") {
+			maps = append(maps, strings.TrimSuffix(name, ".pk3"))
+		}
+	}
+	return maps
+}
+
+func downloadMaps(conf map[string]string) {
+	seen := map[string]bool{}
+	var candidates []string
+	add := func(name string) {
+		if name != "" && !seen[name] {
+			seen[name] = true
+			candidates = append(candidates, name)
+		}
+	}
+	for _, m := range strings.Split(os.Getenv("MAPS"), ":") {
+		add(strings.TrimSpace(m))
+	}
+	if conf["MAPS_AUTO"] == "true" {
+		for _, m := range scanLocalMapVolume() {
+			add(m)
+		}
+	}
+	if len(candidates) == 0 {
+		return
+	}
+
+	var toDownload []string
+	for _, m := range candidates {
 		dest := filepath.Join(etmainDir, m+".pk3")
 		if _, err := os.Stat(dest); err == nil {
 			continue
