@@ -99,6 +99,7 @@ func loadConf() map[string]string {
 		"ASSETS_URL":              		 getenv("ASSETS_URL", ""),
 		"OMNIBOT":                 		 getenv("OMNIBOT", "0"),
 		"MAPS_AUTO":               		 getenv("MAPS_AUTO", "true"),
+		"MAPS_FORCE_COPY":         		 getenv("MAPS_FORCE_COPY", "false"),
 	}
 
 	if conf["STATS_SUBMIT"] == "true" && conf["SETTINGSBRANCH"] == "main" {
@@ -183,6 +184,7 @@ func dlFmtBytes(n int64) string {
 func scanLocalMapVolume() []string {
 	entries, err := os.ReadDir("/maps")
 	if err != nil {
+		fmt.Printf("Maps: /maps volume not readable: %v\n", err)
 		return nil
 	}
 	var maps []string
@@ -216,18 +218,26 @@ func downloadMaps(conf map[string]string) {
 		}
 	}
 	if len(candidates) == 0 {
+		fmt.Println("Maps: no candidates (MAPS env empty, MAPS_AUTO found nothing)")
 		return
 	}
+	fmt.Printf("Maps: %d candidate(s) to process\n", len(candidates))
 
+	forceCopy := conf["MAPS_FORCE_COPY"] == "true"
 	var toDownload []string
 	for _, m := range candidates {
 		dest := filepath.Join(etmainDir, m+".pk3")
-		if _, err := os.Stat(dest); err == nil {
-			continue
+		if !forceCopy {
+			if _, err := os.Stat(dest); err == nil {
+				fmt.Printf("Map %s already in etmain, skipping\n", m)
+				continue
+			}
 		}
 		if _, err := os.Stat("/maps/" + m + ".pk3"); err == nil {
 			fmt.Printf("Map %s is sourcable locally, copying into place\n", m)
-			copyFile("/maps/"+m+".pk3", dest)
+			if err := copyFile("/maps/"+m+".pk3", dest); err != nil {
+				fmt.Printf("WARNING: Failed to copy %s: %v\n", m, err)
+			}
 		} else {
 			toDownload = append(toDownload, m)
 		}

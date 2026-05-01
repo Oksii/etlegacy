@@ -94,6 +94,7 @@ SETTINGSBRANCH        | The git branch for the ETL settings repository. | ``main
 ADDITIONAL_CLI_ARGS   | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | ``None``
 OMNIBOT               | Enable Omnibot AI. `0` = disabled, `1` = enabled | ``0``
 MAPS_AUTO             | Auto-copy all `.pk3` files from the `/maps` volume without requiring `MAPS=` | ``true``
+MAPS_FORCE_COPY       | Always re-copy maps from `/maps` volume, even if they already exist in etmain. Useful when updating pk3 files in the volume. | ``false``
 AUTORESTART           | Enable the built-in autorestart daemon | ``true``
 AUTORESTART_INTERVAL  | How often (in minutes) the daemon checks whether to restart. Set to `0` to disable the daemon | ``120``
 AUTORESTART_PLAYERS   | Maximum number of active players that still allows a restart. `0` = only restart when completely empty | ``0``
