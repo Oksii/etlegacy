@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,62 +32,76 @@ func getenv(key, def string) string {
 	return def
 }
 
+func parseBoolValue(v string, def bool) bool {
+	s := strings.TrimSpace(strings.ToLower(v))
+	switch s {
+	case "":
+		return def
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return def
+	}
+}
+
 func loadConf() map[string]string {
 	conf := map[string]string{
-		"HOSTNAME":                		 getenv("HOSTNAME", "ETL Docker Server"),
-		"MAP_PORT":                		 getenv("MAP_PORT", "27960"),
-		"MAP_IP":                  		 getenv("MAP_IP", ""),
-		"REDIRECTURL":             		 getenv("REDIRECTURL", "https://dl.etl.lol/maps/et"),
-		"MAXCLIENTS":              		 getenv("MAXCLIENTS", "24"),
-		"STARTMAP":                		 getenv("STARTMAP", "radar"),
-		"SERVERCONF":              		 getenv("SERVERCONF", "legacy6"),
-		"SVTRACKER":               		 getenv("SVTRACKER", ""),
-		"ADVERT":                  		 getenv("ADVERT", "0"),
-		"MOTD":                    		 getenv("CONF_MOTD", ""),
-		"PASSWORD":                		 getenv("PASSWORD", ""),
-		"RCONPASSWORD":            		 getenv("RCONPASSWORD", ""),
-		"REFPASSWORD":             		 getenv("REFPASSWORD", ""),
-		"SCPASSWORD":              		 getenv("SCPASSWORD", ""),
-		"SVAUTODEMO":              		 getenv("SVAUTODEMO", "0"),
-		"ETLTVMAXSLAVES":          		 getenv("SVETLTVMAXSLAVES", "2"),
-		"ETLTVPASSWORD":           		 getenv("SVETLTVPASSWORD", "3tltv"),
-		"SETTINGSURL":             		 getenv("SETTINGSURL", "https://github.com/Oksii/legacy-configs.git"),
-		"SETTINGSPAT":             		 getenv("SETTINGSPAT", ""),
-		"SETTINGSBRANCH":          		 getenv("SETTINGSBRANCH", "main"),
-		"STATS_SUBMIT":            		 getenv("STATS_SUBMIT", "false"),
-		"STATS_API_TOKEN":         		 getenv("STATS_API_TOKEN", "GameStatsWebLuaToken"),
-		"STATS_API_PATH":          		 getenv("STATS_API_PATH", "/legacy/homepath/legacy/stats/"),
-		"STATS_API_URL_SUBMIT":    		 getenv("STATS_API_URL_SUBMIT", "https://api.etl.lol/api/v2/stats/etl/matches/stats/submit"),
-		"STATS_API_URL_MATCHID":   		 getenv("STATS_API_URL_MATCHID", "https://api.etl.lol/api/v2/stats/etl/match-manager"),
-		"STATS_API_URL_VERSION":   		 getenv("STATS_API_URL_VERSION", "https://api.etl.lol/api/v2/stats/etl/matches/stats/version"),
-		"STATS_API_LOG":           		 getenv("STATS_API_LOG", "false"),
-		"STATS_API_LOG_LEVEL":     		 getenv("STATS_API_LOG_LEVEL", "info"),
-		"STATS_API_GAMELOG":       		 getenv("STATS_API_GAMELOG", "true"),
-		"STATS_API_OBJSTATS":      		 getenv("STATS_API_OBJSTATS", "true"),
-		"STATS_API_SHOVESTATS":    		 getenv("STATS_API_SHOVESTATS", "true"),
-		"STATS_API_MOVEMENTSTATS": 		 getenv("STATS_API_MOVEMENTSTATS", "true"),
-		"STATS_API_STANCESTATS":   		 getenv("STATS_API_STANCESTATS", "true"),
+		"HOSTNAME":                      getenv("HOSTNAME", "ETL Docker Server"),
+		"MAP_PORT":                      getenv("MAP_PORT", "27960"),
+		"MAP_IP":                        getenv("MAP_IP", ""),
+		"REDIRECTURL":                   getenv("REDIRECTURL", "https://dl.etl.lol/maps/et"),
+		"MAXCLIENTS":                    getenv("MAXCLIENTS", "24"),
+		"STARTMAP":                      getenv("STARTMAP", "radar"),
+		"SERVERCONF":                    getenv("SERVERCONF", "legacy6"),
+		"SVTRACKER":                     getenv("SVTRACKER", ""),
+		"ADVERT":                        getenv("ADVERT", "0"),
+		"MOTD":                          getenv("CONF_MOTD", ""),
+		"PASSWORD":                      getenv("PASSWORD", ""),
+		"RCONPASSWORD":                  getenv("RCONPASSWORD", ""),
+		"REFPASSWORD":                   getenv("REFPASSWORD", ""),
+		"SCPASSWORD":                    getenv("SCPASSWORD", ""),
+		"SVAUTODEMO":                    getenv("SVAUTODEMO", "0"),
+		"ETLTVMAXSLAVES":                getenv("SVETLTVMAXSLAVES", "2"),
+		"ETLTVPASSWORD":                 getenv("SVETLTVPASSWORD", "3tltv"),
+		"SETTINGSURL":                   getenv("SETTINGSURL", "https://github.com/Oksii/legacy-configs.git"),
+		"SETTINGSPAT":                   getenv("SETTINGSPAT", ""),
+		"SETTINGSBRANCH":                getenv("SETTINGSBRANCH", "main"),
+		"STATS_SUBMIT":                  getenv("STATS_SUBMIT", "false"),
+		"STATS_API_TOKEN":               getenv("STATS_API_TOKEN", "GameStatsWebLuaToken"),
+		"STATS_API_PATH":                getenv("STATS_API_PATH", "/legacy/homepath/legacy/stats/"),
+		"STATS_API_URL_SUBMIT":          getenv("STATS_API_URL_SUBMIT", "https://api.etl.lol/api/v2/stats/etl/matches/stats/submit"),
+		"STATS_API_URL_MATCHID":         getenv("STATS_API_URL_MATCHID", "https://api.etl.lol/api/v2/stats/etl/match-manager"),
+		"STATS_API_URL_VERSION":         getenv("STATS_API_URL_VERSION", "https://api.etl.lol/api/v2/stats/etl/matches/stats/version"),
+		"STATS_API_LOG":                 getenv("STATS_API_LOG", "false"),
+		"STATS_API_LOG_LEVEL":           getenv("STATS_API_LOG_LEVEL", "info"),
+		"STATS_API_GAMELOG":             getenv("STATS_API_GAMELOG", "true"),
+		"STATS_API_OBJSTATS":            getenv("STATS_API_OBJSTATS", "true"),
+		"STATS_API_SHOVESTATS":          getenv("STATS_API_SHOVESTATS", "true"),
+		"STATS_API_MOVEMENTSTATS":       getenv("STATS_API_MOVEMENTSTATS", "true"),
+		"STATS_API_STANCESTATS":         getenv("STATS_API_STANCESTATS", "true"),
 		"STATS_API_WEAPON_FIRE":         getenv("STATS_API_WEAPON_FIRE", "false"),
 		"STATS_API_DUMPJSON":            getenv("STATS_API_DUMPJSON", "false"),
 		"STATS_API_VERSION_CHECK":       getenv("STATS_API_VERSION_CHECK", "true"),
 		"STATS_GATHER_FEATURES":         getenv("STATS_GATHER_FEATURES", "false"),
-		"CF_DEFAULT_CLASS":              getenv("CF_DEFAULT_CLASS",       "true"),
-		"CF_GUID_BLOCKER":               getenv("CF_GUID_BLOCKER",        "true"),
-		"CF_TECH_PAUSE":                 getenv("CF_TECH_PAUSE",          "true"),
-		"CF_TECH_PAUSE_LENGTH":          getenv("CF_TECH_PAUSE_LENGTH",   "600"),
-		"CF_TECH_PAUSE_COUNT":           getenv("CF_TECH_PAUSE_COUNT",    "1"),
-		"CF_PAUSE_LENGTH":               getenv("CF_PAUSE_LENGTH",        "120"),
-		"CF_TEAM_LOCK":                  getenv("CF_TEAM_LOCK",           "true"),
-		"CF_COMMAND_LOGGING":            getenv("CF_COMMAND_LOGGING",     "true"),
-		"CF_COMMAND_LOG_VOTES":          getenv("CF_COMMAND_LOG_VOTES",   "true"),
-		"CF_COMMAND_LOG_REF":            getenv("CF_COMMAND_LOG_REF",     "true"),
+		"CF_DEFAULT_CLASS":              getenv("CF_DEFAULT_CLASS", "true"),
+		"CF_GUID_BLOCKER":               getenv("CF_GUID_BLOCKER", "true"),
+		"CF_TECH_PAUSE":                 getenv("CF_TECH_PAUSE", "true"),
+		"CF_TECH_PAUSE_LENGTH":          getenv("CF_TECH_PAUSE_LENGTH", "600"),
+		"CF_TECH_PAUSE_COUNT":           getenv("CF_TECH_PAUSE_COUNT", "1"),
+		"CF_PAUSE_LENGTH":               getenv("CF_PAUSE_LENGTH", "120"),
+		"CF_TEAM_LOCK":                  getenv("CF_TEAM_LOCK", "true"),
+		"CF_COMMAND_LOGGING":            getenv("CF_COMMAND_LOGGING", "true"),
+		"CF_COMMAND_LOG_VOTES":          getenv("CF_COMMAND_LOG_VOTES", "true"),
+		"CF_COMMAND_LOG_REF":            getenv("CF_COMMAND_LOG_REF", "true"),
 		"CF_SPAWN_INVUL_SECONDS":        getenv("CF_SPAWN_INVUL_SECONDS", "1"),
-		"CF_BAN_REASON":                 getenv("CF_BAN_REASON",          "Banned."),
-		"CF_LOG_FILEPATH":               getenv("CF_LOG_FILEPATH",        ""),
+		"CF_BAN_REASON":                 getenv("CF_BAN_REASON", "Banned."),
+		"CF_LOG_FILEPATH":               getenv("CF_LOG_FILEPATH", ""),
 		"CF_GUID_BLOCKER_TARGETS":       getenv("CF_GUID_BLOCKER_TARGETS", "F2ECF20F3ED6A5A93F2C49EF239F4488"),
-		"CF_BANNED_GUIDS":               getenv("CF_BANNED_GUIDS",        ""),
-		"CF_BANNED_IPS":                 getenv("CF_BANNED_IPS",          ""),
-		"CF_VOTE_BANNED_GUIDS":          getenv("CF_VOTE_BANNED_GUIDS",   ""),
+		"CF_BANNED_GUIDS":               getenv("CF_BANNED_GUIDS", ""),
+		"CF_BANNED_IPS":                 getenv("CF_BANNED_IPS", ""),
+		"CF_VOTE_BANNED_GUIDS":          getenv("CF_VOTE_BANNED_GUIDS", ""),
 		"STATS_AUTO_CONFIG_2":           getenv("STATS_AUTO_CONFIG_2", "legacy1"),
 		"STATS_AUTO_CONFIG_4":           getenv("STATS_AUTO_CONFIG_4", "legacy3"),
 		"STATS_AUTO_CONFIG_6":           getenv("STATS_AUTO_CONFIG_6", "legacy3"),
@@ -95,11 +110,11 @@ func loadConf() map[string]string {
 		"STATS_AUTO_SCORES":             getenv("STATS_AUTO_SCORES", "false"),
 		"STATS_AUTO_START_WAIT_INITIAL": getenv("STATS_AUTO_START_WAIT_INITIAL", "420"),
 		"STATS_AUTO_START_WAIT":         getenv("STATS_AUTO_START_WAIT", "180"),
-		"ASSETS":                  		 getenv("ASSETS", "false"),
-		"ASSETS_URL":              		 getenv("ASSETS_URL", ""),
-		"OMNIBOT":                 		 getenv("OMNIBOT", "0"),
-		"MAPS_AUTO":               		 getenv("MAPS_AUTO", "true"),
-		"MAPS_FORCE_COPY":         		 getenv("MAPS_FORCE_COPY", "false"),
+		"ASSETS":                        getenv("ASSETS", "false"),
+		"ASSETS_URL":                    getenv("ASSETS_URL", ""),
+		"OMNIBOT":                       getenv("OMNIBOT", "0"),
+		"MAPS_AUTO":                     getenv("MAPS_AUTO", "true"),
+		"MAPS_FORCE_COPY":               getenv("MAPS_FORCE_COPY", "false"),
 	}
 
 	if conf["STATS_SUBMIT"] == "true" && conf["SETTINGSBRANCH"] == "main" {
@@ -140,25 +155,86 @@ func loadConf() map[string]string {
 	return conf
 }
 
-func updateConfigs(conf map[string]string) {
+func updateConfigs(conf map[string]string) (bool, error) {
 	fmt.Println("Checking for configuration updates...")
 	authURL := conf["SETTINGSURL"]
 	if pat := conf["SETTINGSPAT"]; pat != "" {
 		authURL = strings.Replace(authURL, "https://", "https://"+pat+"@", 1)
 	}
 	newSettings := settingsBase + ".new"
-	os.RemoveAll(newSettings)
+	if err := os.RemoveAll(newSettings); err != nil {
+		return false, fmt.Errorf("remove previous staging dir %s: %w", newSettings, err)
+	}
 	cmd := exec.Command("git", "clone", "--depth", "1", "--single-branch",
 		"--branch", conf["SETTINGSBRANCH"], authURL, newSettings)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Println("Configuration repo could not be pulled, using latest pulled version")
-		return
+		return false, fmt.Errorf("git clone failed: %w", err)
 	}
-	os.RemoveAll(settingsBase)
-	if err := os.Rename(newSettings, settingsBase); err != nil {
-		fmt.Printf("WARNING: Failed to move new settings into place: %v\n", err)
+
+	revCmd := exec.Command("git", "-C", newSettings, "rev-parse", "--short", "HEAD")
+	revOut, revErr := revCmd.Output()
+	if revErr == nil {
+		fmt.Printf("Settings source revision: %s\n", strings.TrimSpace(string(revOut)))
+	} else {
+		fmt.Printf("WARNING: Could not resolve settings source revision: %v\n", revErr)
 	}
+
+	if err := syncSettingsDir(newSettings, settingsBase); err != nil {
+		return false, err
+	}
+	if err := os.RemoveAll(newSettings); err != nil {
+		fmt.Printf("WARNING: Failed to remove staging settings dir %s: %v\n", newSettings, err)
+	}
+	return true, nil
+}
+
+func syncSettingsDir(srcDir, dstDir string) error {
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		return fmt.Errorf("create destination settings dir %s: %w", dstDir, err)
+	}
+	entries, err := os.ReadDir(dstDir)
+	if err != nil {
+		return fmt.Errorf("read destination settings dir %s: %w", dstDir, err)
+	}
+	for _, entry := range entries {
+		if err := os.RemoveAll(filepath.Join(dstDir, entry.Name())); err != nil {
+			return fmt.Errorf("clean destination settings dir %s: %w", dstDir, err)
+		}
+	}
+	return filepath.WalkDir(srcDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		dstPath := filepath.Join(dstDir, rel)
+		if d.IsDir() {
+			return os.MkdirAll(dstPath, 0755)
+		}
+		return copyFile(path, dstPath)
+	})
+}
+
+func clearDirContents(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if err := os.RemoveAll(filepath.Join(dir, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func dlProgressBar(done, total int) string {
@@ -338,6 +414,9 @@ func copyGameAssets() {
 		copyFile(s, etmainDir+"/mapscripts/"+filepath.Base(s))
 	}
 
+	if err := clearDirContents(legacyDir + "/luascripts"); err != nil {
+		fmt.Printf("WARNING: Failed to clear luascripts directory: %v\n", err)
+	}
 	srcLua := settingsBase + "/luascripts"
 	filepath.WalkDir(srcLua, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -351,6 +430,9 @@ func copyGameAssets() {
 		return copyFile(path, dst)
 	})
 
+	for _, cm := range mustGlob(legacyDir + "/*.pk3") {
+		os.Remove(cm)
+	}
 	for _, cm := range mustGlob(settingsBase + "/commandmaps/*.pk3") {
 		copyFile(cm, legacyDir+"/"+filepath.Base(cm))
 	}
@@ -525,8 +607,20 @@ func main() {
 		}
 	}
 
-	if getenv("AUTO_UPDATE", "true") == "true" {
-		updateConfigs(conf)
+	autoUpdate := parseBoolValue(os.Getenv("AUTO_UPDATE"), true)
+	fmt.Printf("Settings source URL: %s\n", conf["SETTINGSURL"])
+	fmt.Printf("Settings branch: %s\n", conf["SETTINGSBRANCH"])
+	fmt.Printf("AUTO_UPDATE resolved: %t\n", autoUpdate)
+
+	if autoUpdate {
+		updated, err := updateConfigs(conf)
+		if err != nil {
+			fmt.Printf("WARNING: Settings update failed: %v. Using last known settings.\n", err)
+		} else if updated {
+			fmt.Println("Settings update applied.")
+		}
+	} else {
+		fmt.Println("AUTO_UPDATE disabled; using existing settings.")
 	}
 	downloadMaps(conf)
 	copyGameAssets()
