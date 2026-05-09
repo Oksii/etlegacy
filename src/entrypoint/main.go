@@ -18,11 +18,12 @@ import (
 )
 
 const (
-	gameBase     = "/legacy/server"
-	settingsBase = gameBase + "/settings"
-	etmainDir    = gameBase + "/etmain"
-	legacyDir    = gameBase + "/legacy"
-	homepath     = "/legacy/homepath"
+	gameBase         = "/legacy/server"
+	settingsBase     = gameBase + "/settings"
+	etmainDir        = gameBase + "/etmain"
+	legacyDir        = gameBase + "/legacy"
+	homepath         = "/legacy/homepath"
+	settingsManifest = settingsBase + "/.managed-settings-files"
 )
 
 func getenv(key, def string) string {
@@ -193,16 +194,18 @@ func syncSettingsDir(srcDir, dstDir string) error {
 	if err := os.MkdirAll(dstDir, 0755); err != nil {
 		return fmt.Errorf("create destination settings dir %s: %w", dstDir, err)
 	}
-	entries, err := os.ReadDir(dstDir)
-	if err != nil {
-		return fmt.Errorf("read destination settings dir %s: %w", dstDir, err)
-	}
-	for _, entry := range entries {
-		if err := os.RemoveAll(filepath.Join(dstDir, entry.Name())); err != nil {
-			return fmt.Errorf("clean destination settings dir %s: %w", dstDir, err)
+
+	for _, rel := range readManagedRelPaths(settingsManifest) {
+		if rel == ".git" || strings.HasPrefix(rel, ".git/") {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dstDir, rel)); err != nil {
+			return fmt.Errorf("cleanup managed settings path %s: %w", rel, err)
 		}
 	}
-	return filepath.WalkDir(srcDir, func(path string, d os.DirEntry, err error) error {
+
+	var managed []string
+	err := filepath.WalkDir(srcDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -213,12 +216,21 @@ func syncSettingsDir(srcDir, dstDir string) error {
 		if rel == "." {
 			return nil
 		}
+		if rel == ".git" || strings.HasPrefix(rel, ".git/") {
+			return nil
+		}
+		managed = append(managed, rel)
 		dstPath := filepath.Join(dstDir, rel)
 		if d.IsDir() {
 			return os.MkdirAll(dstPath, 0755)
 		}
 		return copyFile(path, dstPath)
 	})
+	if err != nil {
+		return err
+	}
+	writeManagedRelPaths(settingsManifest, managed)
+	return nil
 }
 
 func clearDirContents(dir string) error {
@@ -235,6 +247,36 @@ func clearDirContents(dir string) error {
 		}
 	}
 	return nil
+}
+
+func readManagedRelPaths(path string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(string(data), "\n") {
+		rel := strings.TrimSpace(line)
+		if rel == "" || filepath.IsAbs(rel) {
+			continue
+		}
+		clean := filepath.Clean(rel)
+		if clean == "." || strings.HasPrefix(clean, "..") {
+			continue
+		}
+		out = append(out, clean)
+	}
+	return out
+}
+
+func writeManagedRelPaths(path string, relPaths []string) {
+	content := strings.Join(relPaths, "\n")
+	if content != "" {
+		content += "\n"
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		fmt.Printf("WARNING: Failed to write settings manifest %s: %v\n", path, err)
+	}
 }
 
 func dlProgressBar(done, total int) string {
@@ -430,11 +472,11 @@ func copyGameAssets() {
 		return copyFile(path, dst)
 	})
 
-	for _, cm := range mustGlob(legacyDir + "/*.pk3") {
-		os.Remove(cm)
-	}
 	for _, cm := range mustGlob(settingsBase + "/commandmaps/*.pk3") {
-		copyFile(cm, legacyDir+"/"+filepath.Base(cm))
+		name := filepath.Base(cm)
+		if err := copyFile(cm, legacyDir+"/"+name); err != nil {
+			fmt.Printf("WARNING: Failed to copy commandmap %s: %v\n", name, err)
+		}
 	}
 
 	os.RemoveAll(etmainDir + "/configs")
