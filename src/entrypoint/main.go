@@ -71,7 +71,7 @@ func loadConf() map[string]string {
 		"SETTINGSBRANCH":                getenv("SETTINGSBRANCH", "main"),
 		"STATS_SUBMIT":                  getenv("STATS_SUBMIT", "false"),
 		"STATS_API_TOKEN":               getenv("STATS_API_TOKEN", "GameStatsWebLuaToken"),
-		"STATS_API_PATH":                getenv("STATS_API_PATH", "/legacy/homepath/legacy/stats/"),
+		"STATS_API_PATH":                getenv("STATS_API_PATH", ""),
 		"STATS_API_URL_SUBMIT":          getenv("STATS_API_URL_SUBMIT", "https://api.etl.lol/api/v2/stats/etl/matches/stats/submit"),
 		"STATS_API_URL_MATCHID":         getenv("STATS_API_URL_MATCHID", "https://api.etl.lol/api/v2/stats/etl/match-manager"),
 		"STATS_API_URL_VERSION":         getenv("STATS_API_URL_VERSION", "https://api.etl.lol/api/v2/stats/etl/matches/stats/version"),

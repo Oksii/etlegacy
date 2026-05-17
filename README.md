@@ -123,7 +123,7 @@ STATS_API_TOKEN         | API bearer token for submission requests | ``None``
 STATS_API_URL_SUBMIT    | Endpoint to POST the match report JSON to | ``None``
 STATS_API_URL_MATCHID   | Endpoint to fetch match ID from (`<base>/<server_ip>/<port>`) | ``None``
 STATS_API_URL_VERSION   | Endpoint for stats module version checks | ``None``
-STATS_API_PATH          | Directory path for local JSON dumps and log file | `/legacy/homepath/legacy/stats/`
+STATS_API_PATH          | Shared output dir for `game_stats.log` and local JSON dumps. Auto-detected (`<fs_homepath>/legacy/`) when empty. | ``None``
 STATS_API_LOG           | Enable stats log file | ``false``
 STATS_API_LOG_LEVEL     | Log verbosity: `info` or `debug` | ``info``
 STATS_API_DUMPJSON      | Write indented JSON to `STATS_API_PATH` at round end | ``false``
