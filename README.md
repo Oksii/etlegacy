@@ -140,8 +140,11 @@ STATS_AUTO_START             | (Gather only) Automatically ready-up all players 
 STATS_AUTO_MAP               | (Gather only) Switch to next map in rotation after round 2 intermission | ``false``
 STATS_AUTO_CONFIG            | (Gather only) Apply server config based on roster player count at match start | ``false``
 STATS_AUTO_SCORES            | (Gather only) Track match scores across a best-of-3 series; embeds score state into each stats submission | ``false``
-STATS_AUTO_START_WAIT_INITIAL | (Gather only) Seconds before force-start on map 1 round 1 | ``420``
+STATS_AUTO_START_WAIT_INITIAL | (Gather only) Seconds before force-start on map 1 round 1 (simple mode only) | ``420``
 STATS_AUTO_START_WAIT        | (Gather only) Seconds before force-start on all subsequent rounds | ``180``
+STATS_AUTO_START_MODE        | (Gather only) `simple` = single window using `WAIT_INITIAL`/`WAIT`. `phased` splits the first start into a connect phase (bans for not connecting) followed by a ready phase (force-starts). Subsequent rounds still use the simple short timer. | ``simple``
+STATS_AUTO_START_CONNECT_WAIT | (Gather only, phased mode) Seconds for the connect phase — players must be connected to the server by `T-0` or get banned | ``180``
+STATS_AUTO_START_READY_WAIT  | (Gather only, phased mode) Seconds for the ready phase that follows connect — force-starts the match at `T-0` | ``120``
 STATS_AUTO_CONFIG_2          | (Gather only) Server config applied for ≤2-player matches (e.g. `legacy1`) | ``legacy1``
 STATS_AUTO_CONFIG_4          | (Gather only) Server config applied for ≤4-player matches | ``legacy3``
 STATS_AUTO_CONFIG_6          | (Gather only) Server config applied for ≤6-player matches | ``legacy3``
