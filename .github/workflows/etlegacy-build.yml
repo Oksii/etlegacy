@@ -374,11 +374,17 @@ jobs:
         if: github.event.inputs.set_stable != ''
         run: |
           echo "Setting version ${{ github.event.inputs.set_stable }} as stable..."
-          
-          docker pull ${DOCKER_IMAGE}:${{ github.event.inputs.set_stable }}
-          docker tag ${DOCKER_IMAGE}:${{ github.event.inputs.set_stable }} ${DOCKER_IMAGE}:stable
-          docker push ${DOCKER_IMAGE}:stable
-          
+
+          # imagetools copies the whole manifest list (every platform the source
+          # tag has) server-side. docker pull/tag/push would flatten it to the
+          # runner's own arch and silently drop arm64.
+          docker buildx imagetools create \
+            --tag ${DOCKER_IMAGE}:stable \
+            ${DOCKER_IMAGE}:${{ github.event.inputs.set_stable }}
+
+          echo "Platforms now published as :stable"
+          docker buildx imagetools inspect ${DOCKER_IMAGE}:stable
+
           echo "Successfully set ${{ github.event.inputs.set_stable }} as stable"
 
       - name: Trigger Watchtower Update

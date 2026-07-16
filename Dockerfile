@@ -46,13 +46,18 @@ WORKDIR /build
 COPY go.mod .
 COPY src/ src/
 
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+# Declared without defaults: BuildKit only injects the predefined platform
+# values into a stage when the ARG has no default, and a default here would
+# silently cross-compile everything to amd64.
+ARG TARGETOS
+ARG TARGETARCH
 
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o start ./src/entrypoint/ && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -ldflags="-s -w" -o autorestart ./src/autorestart/
+    go build -ldflags="-s -w" -o autorestart ./src/autorestart/ && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -o etlutil ./src/etlutil/
 
 # Final stage
 FROM debian:stable-slim
@@ -69,6 +74,7 @@ COPY --from=builder --chown=legacy:legacy /legacy /legacy/
 COPY --chown=legacy:legacy vendor/dkjson.lua /legacy/server/legacy/dkjson.lua
 COPY --from=go-builder --chmod=755 --chown=legacy:legacy /build/start /legacy/server/start
 COPY --from=go-builder --chmod=755 --chown=legacy:legacy /build/autorestart /legacy/server/autorestart
+COPY --from=go-builder --chmod=755 --chown=legacy:legacy /build/etlutil /legacy/server/etlutil
 
 VOLUME ["/legacy/homepath", "/legacy/server/etmain"]
 WORKDIR /legacy/server

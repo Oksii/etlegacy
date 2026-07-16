@@ -1250,7 +1250,7 @@ configure_server_settings() {
         
         log "prompt" "Basic Settings:"
         echo -e "${BLUE}     1. STARTMAP               ${NC}- Starting map (default: radar)"
-        echo -e "${BLUE}     2. MAXCLIENTS             ${NC}- Maximum players (default: 32)"
+        echo -e "${BLUE}     2. MAXCLIENTS             ${NC}- Maximum players (default: 24)"
         echo -e "${BLUE}     3. AUTO_UPDATE            ${NC}- Auto-update configs (default: true)"
         echo -e "${BLUE}     4. CONF_MOTD$             ${NC}- Message of the day (default: none)"
         echo -e "${BLUE}     5. SERVERCONF             ${NC}- Config to load (default: legacy6)"
@@ -1266,7 +1266,7 @@ configure_server_settings() {
 
         case $option in
             1) configure_setting "STARTMAP" "radar" "Map server starts on" "Server Settings" ;;
-            2) configure_setting "MAXCLIENTS" "32" "Maximum number of players" "Server Settings" ;;
+            2) configure_setting "MAXCLIENTS" "24" "Maximum number of players" "Server Settings" ;;
             3) configure_setting "AUTO_UPDATE" "true" "Update configurations on restart" "Server Settings" "true" ;;
             4) configure_motd ;;
             5) configure_setting "SERVERCONF" "legacy6" "Configuration to load on startup" "Server Settings" ;;
@@ -1605,7 +1605,7 @@ setup_stats_variables() {
         store_setting "Stats Configuration" "STATS_API_MOVEMENTSTATS" "true"
         store_setting "Stats Configuration" "STATS_API_STANCESTATS" "true"
         store_setting "Stats Configuration" "STATS_API_WEAPON_FIRE" "false"
-        store_setting "Stats Configuration" "STATS_API_FORCERENAME" "false"
+        store_setting "Stats Configuration" "STATS_GATHER_FEATURES" "false"
         store_setting "Stats Configuration" "STATS_API_VERSION_CHECK" "true"
     else
         store_setting "Stats Configuration" "STATS_SUBMIT" "false"
@@ -1889,14 +1889,16 @@ update_servers() {
         local has_players=0
         local player_info=""
         
-        # Check each server for players using existing parse_quakestat function
+        # Check each server for players using existing query_server function
         for container in $(docker ps -a --filter "name=etl-server" --format "{{.Names}}" | sort); do
-            local port=$(docker inspect "$container" | grep -Po '"MAP_PORT=\K[^"]*')
-            local server_info=$(parse_quakestat "$container" "$port")
-            
+            # Assign separately: `local x=$(...)` would make $? the status of
+            # `local`, masking a failed query.
+            local server_info
+            server_info=$(query_server "$container")
+
             if [ $? -eq 0 ]; then
-                local name map players
-                IFS='|' read -r name map players <<< "$server_info"
+                local name map players maxclients
+                IFS='|' read -r name map players maxclients <<< "$server_info"
                 
                 if [ "${players:-0}" -gt 0 ]; then
                     has_players=1
@@ -1924,12 +1926,12 @@ update_servers() {
         fi
     else
         local service_name="etl-server$instance"
-        local port=$(docker inspect "$service_name" | grep -Po '"MAP_PORT=\K[^"]*')
-        local server_info=$(parse_quakestat "$service_name" "$port")
-        
+        local server_info
+        server_info=$(query_server "$service_name")
+
         if [ $? -eq 0 ]; then
-            local name map players
-            IFS='|' read -r name map players <<< "$server_info"
+            local name map players maxclients
+            IFS='|' read -r name map players maxclients <<< "$server_info"
             
             if [ "${players:-0}" -gt 0 ] && [ "$force" != "--force" ]; then
                 echo "Warning: Server $service_name ($name) has $players active players on map $map!"
@@ -1960,23 +1962,12 @@ update_servers() {
     fi
 }
 
-parse_quakestat() {
+# Query a server via the etlutil binary shipped in the container.
+# Outputs: name|map|players|maxclients
+query_server() {
     local container="$1"
-    local port="$2"
-    local xml_output
 
-    xml_output=$(docker exec "$container" quakestat -xml -rws "localhost:$port" 2>/dev/null)
-    if [ $? -ne 0 ]; then
-        return 1
-    fi
-
-    # Parse XML using grep and sed
-    local name map players
-    name=$(echo "$xml_output" | grep -oP '<name>\K[^<]+')
-    map=$(echo "$xml_output" | grep -oP '<map>\K[^<]+')
-    players=$(echo "$xml_output" | grep -oP '<numplayers>\K[^<]+')
-
-    echo "$name|$map|$players"
+    docker exec "$container" ./etlutil status 2>/dev/null
 }
 
 get_container_status() {
@@ -2009,16 +2000,16 @@ get_container_status() {
     refpass=$(docker inspect "$container" | grep -Po '"REFPASSWORD=\K[^"]*' || echo "-")
 
     # Get additional server info if container is running
-    local server_info map players name
+    local server_info map players name maxclients
     if [ "$state" = "running" ]; then
-        server_info=$(parse_quakestat "$container" "$port")
+        server_info=$(query_server "$container")
         if [ $? -eq 0 ]; then
-            IFS='|' read -r name map players <<< "$server_info"
+            IFS='|' read -r name map players maxclients <<< "$server_info"
         else
-            name="-" map="-" players="-"
+            name="-" map="-" players="-" maxclients="-"
         fi
     else
-        name="-" map="-" players="-"
+        name="-" map="-" players="-" maxclients="-"
     fi
 
     # Print status with fixed width columns
@@ -2027,7 +2018,7 @@ get_container_status() {
            "$status" \
            "${name:--}" \
            "${map:--}" \
-           "${players:-0}/32" \
+           "${players:-0}/${maxclients:-0}" \
            "$port" \
            "$password" \
            "$rconpass" \
@@ -2058,19 +2049,8 @@ execute_rcon() {
     local command="$2"
     local container="etl-server$instance"
 
-    # Get port and rconpass from container
-    local port rconpass
-    port=$(docker inspect "$container" | grep -Po '"MAP_PORT=\K[^"]*')
-    rconpass=$(docker inspect "$container" | grep -Po '"RCONPASSWORD=\K[^"]*')
-
-    if [ -z "$port" ] || [ -z "$rconpass" ]; then
-        echo "Error: Could not get port or RCON password for server $instance"
-        return 1
-    fi
-
-    # Execute RCON command and filter out the header
-    docker exec "$container" icecon "localhost:$port" "$rconpass" -c "$command" | \
-        awk 'NR>3' # Skip the first 3 lines (header)
+    # etlutil reads MAP_PORT and RCONPASSWORD from the container's environment
+    docker exec "$container" ./etlutil rcon "$command"
 }
 
 if [ $# -lt 1 ]; then

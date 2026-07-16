@@ -55,6 +55,7 @@ func loadConf() map[string]string {
 		"REDIRECTURL":                   getenv("REDIRECTURL", "https://dl.etl.lol/maps/et"),
 		"MAXCLIENTS":                    getenv("MAXCLIENTS", "24"),
 		"STARTMAP":                      getenv("STARTMAP", "radar"),
+		"TIMEOUTLIMIT":                  getenv("TIMEOUTLIMIT", "1"),
 		"SERVERCONF":                    getenv("SERVERCONF", "legacy6"),
 		"SVTRACKER":                     getenv("SVTRACKER", ""),
 		"ADVERT":                        getenv("ADVERT", "0"),

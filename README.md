@@ -59,7 +59,7 @@ docker run -d \
 Also features the optional setup of:
  * watchtower
  * a minimalistic webserver for REDIRECTURL and wwwDownloads
- * automatic restarts via cron to avoid performance degradation
+ * automatic restarts to avoid performance degradation, via the built-in autorestart daemon (see ``AUTORESTART``, ``AUTORESTART_INTERVAL`` and ``AUTORESTART_PLAYERS``)
  * a helper utility that interacts with the server and docker for easy manage ([``etl-server``](https://github.com/Oksii/etlegacy/edit/main/README.md#etl-server-helper-script))
 
 Allows for single or multiple instances configuration. 
@@ -82,7 +82,7 @@ Environment Variable  | Description                    | Defaults
 REDIRECTURL           | URL of HTTP downloads          | ``https://dl.etl.lol/maps/et``
 MAP_PORT              | Container port (internal)      | ``27960``
 MAP_IP                | Override the server's public IP reported to stats APIs. Auto-detected via ipify if unset. | ``None``
-MAXCLIENTS            | Maximum number of players      | ``32``
+MAXCLIENTS            | Maximum number of players      | ``24``
 AUTO_UPDATE           | Update configurations on restart? | ``true``
 SVTRACKER             | Set sv_tracker endpoint, defaults to ``et.trackbase.net:4444`` via ETL defaults, if none is set. | ``None``
 ADVERT                | `sv_advert`: `0`=none, `1`=master server, `2`=tracker. Auto-set to `2` when `SVTRACKER` is set, otherwise `0`. | ``auto``
