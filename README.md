@@ -132,6 +132,9 @@ STATS_API_OBJSTATS      | Collect objective stats per player | ``true``
 STATS_API_SHOVESTATS    | Collect shove events | ``true``
 STATS_API_MOVEMENTSTATS | Collect movement distance stats | ``true``
 STATS_API_STANCESTATS   | Collect stance time stats (prone, crouch, sprint, etc.) | ``true``
+STATS_API_VEHICLESTATS  | Track escort vehicles (tank/truck) via entity state: per-player escort time/distance and vehicle timeline events (started/stopped/damaged/repaired) | ``true``
+STATS_API_VEHICLE_TELEMETRY | Sample vehicle and objective-carrier positions every second for route replay (higher event volume) | ``true``
+STATS_API_VEHICLE_DAMAGE | Per-player damage/repair tracking for damageable objectives: tanks plus constructibles (command posts, destroyable walls). Trucks are not damageable and never emit these | ``true``
 STATS_API_WEAPON_FIRE   | Collect every weapon fire event (very high volume, not recommended) | ``false``
 STATS_GATHER_FEATURES        | (Gather only) Enable all gather features at once (rename, sort, start, map, config, scores). Overrides individual flags when ``true`` | ``false``
 STATS_AUTO_RENAME            | (Gather only) Enforce team roster player names from gather API | ``false``
