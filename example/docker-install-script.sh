@@ -1604,7 +1604,8 @@ setup_stats_variables() {
         store_setting "Stats Configuration" "STATS_API_SHOVESTATS" "true"
         store_setting "Stats Configuration" "STATS_API_MOVEMENTSTATS" "true"
         store_setting "Stats Configuration" "STATS_API_STANCESTATS" "true"
-        store_setting "Stats Configuration" "STATS_API_WEAPON_FIRE" "false"
+        # false | true | spam | hitscan | utility | support | ids/names, e.g. "spam,-flamethrower"
+        store_setting "Stats Configuration" "STATS_API_WEAPON_FIRE" "spam,utility"
         store_setting "Stats Configuration" "STATS_GATHER_FEATURES" "false"
         store_setting "Stats Configuration" "STATS_API_VERSION_CHECK" "true"
     else
