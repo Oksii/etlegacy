@@ -86,7 +86,7 @@ func loadConf() map[string]string {
 		"STATS_API_VEHICLESTATS":        getenv("STATS_API_VEHICLESTATS", "true"),
 		"STATS_API_VEHICLE_TELEMETRY":   getenv("STATS_API_VEHICLE_TELEMETRY", "true"),
 		"STATS_API_VEHICLE_DAMAGE":      getenv("STATS_API_VEHICLE_DAMAGE", "true"),
-		"STATS_API_WEAPON_FIRE":         getenv("STATS_API_WEAPON_FIRE", "spam,utility"),
+		"STATS_API_WEAPON_FIRE":         getenv("STATS_API_WEAPON_FIRE", "spam,utility,support,-pliers"),
 		"STATS_API_DUMPJSON":            getenv("STATS_API_DUMPJSON", "false"),
 		"STATS_API_VERSION_CHECK":       getenv("STATS_API_VERSION_CHECK", "true"),
 		"STATS_GATHER_FEATURES":         getenv("STATS_GATHER_FEATURES", "false"),
