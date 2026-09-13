@@ -91,6 +91,9 @@ ASSETS_URL            | Provide direct link URL to download assets.pk3 | ``None`
 SETTINGSURL           | The git URL (must be HTTP public) for the ETL settings repository. | ``https://github.com/Oksii/legacy-configs.git``
 SETTINGSPAT           | Github PAT token for private repos | ``None``
 SETTINGSBRANCH        | The git branch for the ETL settings repository. | ``main``
+ETLDED_REPO           | Replace the ``etlded`` binary on startup from this GitHub repo's release assets, e.g. ``mittermichal/etlegacy``. Picks the asset matching the image architecture. Note that ``etlegacy/etlegacy`` publishes no GitHub releases, so this only works against forks that attach server binaries to a release. Unset leaves the binary shipped in the image. | ``None``
+ETLDED_TAG            | Release tag to install when ``ETLDED_REPO`` is set. Not a tag name in two cases: ``latest`` means the newest published release (pre-releases included), and a trailing ``*`` means the newest release whose tag has that prefix, e.g. ``v2.85.0-client-ip-change*`` to follow one branch's builds in a fork that publishes several. | ``latest``
+ETLDED_URL            | Direct URL to an ``etlded`` binary or a zip containing one. Takes precedence over ``ETLDED_REPO``. | ``None``
 ADDITIONAL_CLI_ARGS   | Provide list of args to pass, ie: +set sv_tracker "et.trackbase.com:4444" +set sv_autodemo 2  | ``None``
 OMNIBOT               | Enable Omnibot AI. `0` = disabled, `1` = enabled | ``0``
 MAPS_AUTO             | Auto-copy all `.pk3` files from the `/maps` volume without requiring `MAPS=` | ``true``
