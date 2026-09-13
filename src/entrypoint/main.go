@@ -1,6 +1,9 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -70,6 +74,9 @@ func loadConf() map[string]string {
 		"SETTINGSURL":                   getenv("SETTINGSURL", "https://github.com/Oksii/legacy-configs.git"),
 		"SETTINGSPAT":                   getenv("SETTINGSPAT", ""),
 		"SETTINGSBRANCH":                getenv("SETTINGSBRANCH", "main"),
+		"ETLDED_REPO":                   getenv("ETLDED_REPO", ""),
+		"ETLDED_TAG":                    getenv("ETLDED_TAG", "latest"),
+		"ETLDED_URL":                    getenv("ETLDED_URL", ""),
 		"STATS_SUBMIT":                  getenv("STATS_SUBMIT", "false"),
 		"STATS_API_TOKEN":               getenv("STATS_API_TOKEN", "GameStatsWebLuaToken"),
 		"STATS_API_PATH":                getenv("STATS_API_PATH", ""),
@@ -501,6 +508,251 @@ func mustGlob(pattern string) []string {
 var remainingPlaceholderRe = regexp.MustCompile(`%CONF_[A-Z_]+%`)
 var motdLineRe = regexp.MustCompile(`(?m)^set server_motd[0-9][^\n]*\n?`)
 
+// ----------------------------------------------------------------------------
+// Server binary updates
+//
+// Off unless ETLDED_REPO or ETLDED_URL is set, in which case the etlded binary
+// baked into the image is replaced before the server starts. Lets a patched
+// engine be rolled out by restarting the container rather than rebuilding it,
+// the same way updateConfigs picks up settings changes.
+// ----------------------------------------------------------------------------
+
+// ghRelease is the subset of the GitHub releases API that we need.
+type ghRelease struct {
+	TagName     string    `json:"tag_name"`
+	Draft       bool      `json:"draft"`
+	PublishedAt time.Time `json:"published_at"`
+	Assets      []ghAsset `json:"assets"`
+}
+
+// newestRelease returns the most recently published non-draft release whose tag
+// starts with prefix; an empty prefix matches any tag.
+//
+// The releases endpoint takes no sort parameter and its default order is not
+// contractual, so the choice is made here rather than by taking the first entry.
+// Note that sorting has to use published_at: created_at is a git timestamp (the
+// tagged commit or tag object), so tagging an older commit would sort a new
+// release below older ones.
+func newestRelease(list []ghRelease, prefix string) (ghRelease, bool) {
+	var best ghRelease
+	found := false
+	for _, r := range list {
+		if r.Draft || !strings.HasPrefix(r.TagName, prefix) {
+			continue
+		}
+		if !found || r.PublishedAt.After(best.PublishedAt) {
+			best, found = r, true
+		}
+	}
+	return best, found
+}
+
+type ghAsset struct {
+	Name string `json:"name"`
+	URL  string `json:"browser_download_url"`
+}
+
+// pickAsset chooses the Linux asset matching one of tokens, most specific
+// first. Split out from resolveReleaseAsset so the per-architecture choice can
+// be tested without running on that architecture.
+func pickAsset(assets []ghAsset, tokens []string) (ghAsset, bool) {
+	for _, tok := range tokens {
+		for _, a := range assets {
+			n := strings.ToLower(a.Name)
+			// Linux assets only: the same release carries Windows and macOS builds.
+			if strings.Contains(n, "win") || strings.Contains(n, "osx") || strings.Contains(n, "mac") {
+				continue
+			}
+			if strings.Contains(n, tok) {
+				return a, true
+			}
+		}
+	}
+	return ghAsset{}, false
+}
+
+// archTokens lists the substrings a release asset may use to name this build's
+// architecture, most specific first. runtime.GOARCH is the architecture the
+// entrypoint itself was cross-compiled for, which is the image's architecture.
+func archTokens() []string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return []string{"x86_64", "amd64"}
+	case "arm64":
+		return []string{"aarch64", "arm64"}
+	case "386":
+		return []string{"i386", "x86"}
+	case "arm":
+		return []string{"armv7", "armhf", "arm"}
+	default:
+		return []string{runtime.GOARCH}
+	}
+}
+
+// resolveReleaseAsset finds the download URL of the asset matching this
+// architecture in the given repo's release. An empty tag, or the literal
+// "latest", resolves to the newest published release rather than naming a tag.
+//
+// This needs a repo that attaches binaries to its releases. etlegacy/etlegacy
+// has tags but no GitHub releases, so it cannot be used as a source here.
+func resolveReleaseAsset(repo, tag string) (assetURL, version string, err error) {
+	// A tag of "latest" (or empty) means the newest published release, and a
+	// trailing "*" means the newest release whose tag has that prefix, which is
+	// how a fork publishing several feature branches tracks just one of them.
+	// Both list releases, because /releases/latest hides pre-releases and test
+	// builds usually are pre-releases.
+	prefix, listing := "", true
+	switch {
+	case tag == "" || tag == "latest":
+	case strings.HasSuffix(tag, "*"):
+		prefix = strings.TrimSuffix(tag, "*")
+	default:
+		listing = false
+	}
+
+	api := "https://api.github.com/repos/" + repo + "/releases?per_page=100"
+	if !listing {
+		api = "https://api.github.com/repos/" + repo + "/releases/tags/" + tag
+	}
+
+	req, err := http.NewRequest(http.MethodGet, api, nil)
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("%s returned %s", api, resp.Status)
+	}
+
+	var rel ghRelease
+	if listing {
+		var list []ghRelease
+		if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+			return "", "", fmt.Errorf("decode releases: %w", err)
+		}
+		var found bool
+		if rel, found = newestRelease(list, prefix); !found {
+			if prefix != "" {
+				return "", "", fmt.Errorf("%s has no published release with tag prefix %q", repo, prefix)
+			}
+			return "", "", fmt.Errorf("%s has no published releases", repo)
+		}
+	} else if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+		return "", "", fmt.Errorf("decode release: %w", err)
+	}
+
+	if a, ok := pickAsset(rel.Assets, archTokens()); ok {
+		return a.URL, rel.TagName + "/" + a.Name, nil
+	}
+	return "", "", fmt.Errorf("release %s has no asset for %s", rel.TagName, runtime.GOARCH)
+}
+
+// extractBinary returns the etlded binary from a downloaded asset, unwrapping
+// it if the asset is a zip.
+func extractBinary(data []byte, name string) ([]byte, error) {
+	if !bytes.HasPrefix(data, []byte("PK\x03\x04")) {
+		return data, nil // a bare binary
+	}
+
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, fmt.Errorf("open zip %s: %w", name, err)
+	}
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() || !strings.HasPrefix(filepath.Base(f.Name), "etlded") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return nil, fmt.Errorf("read %s from %s: %w", f.Name, name, err)
+		}
+		defer rc.Close()
+		return io.ReadAll(rc)
+	}
+	return nil, fmt.Errorf("no etlded binary inside %s", name)
+}
+
+// updateServerBinary replaces gameBase/etlded before the server is started.
+// Any failure leaves the existing binary in place: a bad download must not stop
+// the server from coming up.
+func updateServerBinary(conf map[string]string) {
+	assetURL, version := conf["ETLDED_URL"], conf["ETLDED_URL"]
+	if assetURL == "" {
+		if conf["ETLDED_REPO"] == "" {
+			return // disabled, use the binary shipped in the image
+		}
+		var err error
+		assetURL, version, err = resolveReleaseAsset(conf["ETLDED_REPO"], conf["ETLDED_TAG"])
+		if err != nil {
+			fmt.Printf("WARNING: Server binary update skipped: %v\n", err)
+			return
+		}
+	}
+
+	etlded := gameBase + "/etlded"
+	marker := gameBase + "/.etlded-version"
+	if b, err := os.ReadFile(marker); err == nil && strings.TrimSpace(string(b)) == version {
+		fmt.Printf("Server binary already at %s\n", version)
+		return
+	}
+
+	fmt.Printf("Updating server binary (%s) from %s\n", runtime.GOARCH, assetURL)
+	resp, err := (&http.Client{Timeout: 5 * time.Minute}).Get(assetURL)
+	if err != nil {
+		fmt.Printf("WARNING: Server binary download failed: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("WARNING: Server binary download failed: %s returned %s\n", assetURL, resp.Status)
+		return
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("WARNING: Server binary download failed: %v\n", err)
+		return
+	}
+
+	bin, err := extractBinary(data, filepath.Base(assetURL))
+	if err != nil {
+		fmt.Printf("WARNING: Server binary update skipped: %v\n", err)
+		return
+	}
+	if len(bin) == 0 || !bytes.HasPrefix(bin, []byte("\x7fELF")) {
+		fmt.Printf("WARNING: Server binary update skipped: %s is not an ELF binary\n", assetURL)
+		return
+	}
+
+	// Keep the image's own binary once, so ETLDED_REPO= reverts on next restart.
+	if _, err := os.Stat(etlded + ".orig"); errors.Is(err, os.ErrNotExist) {
+		if err := copyFile(etlded, etlded+".orig"); err != nil {
+			fmt.Printf("WARNING: Could not back up original binary: %v\n", err)
+		}
+	}
+
+	// Write beside the target and rename, so a partial write is never executed.
+	tmp := etlded + ".new"
+	if err := os.WriteFile(tmp, bin, 0755); err != nil {
+		fmt.Printf("WARNING: Server binary update failed: %v\n", err)
+		return
+	}
+	if err := os.Rename(tmp, etlded); err != nil {
+		fmt.Printf("WARNING: Server binary update failed: %v\n", err)
+		os.Remove(tmp)
+		return
+	}
+	if err := os.WriteFile(marker, []byte(version), 0644); err != nil {
+		fmt.Printf("WARNING: Could not record installed binary version: %v\n", err)
+	}
+	fmt.Printf("Server binary updated to %s\n", version)
+}
+
 func updateServerConfig(conf map[string]string) {
 	cfgPath := etmainDir + "/etl_server.cfg"
 	if err := copyFile(settingsBase+"/etl_server.cfg", cfgPath); err != nil {
@@ -675,6 +927,7 @@ func main() {
 	copyGameAssets()
 	updateServerConfig(conf)
 	handleExtraContent(conf)
+	updateServerBinary(conf)
 
 	needpass := "0"
 	if conf["PASSWORD"] != "" {
