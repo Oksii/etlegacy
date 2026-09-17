@@ -17,7 +17,7 @@ RUN mkdir -p etmain/mapscripts legacy && \
     unzip -q et_full.zip && \
     chmod +x et260b.x86_keygen_V03.run && \
     sh et260b.x86_keygen_V03.run --tar xf && \
-    cp /tmp/etmain/pak*.pk3 /legacy/server/etmain/ && \
+    cp /tmp/etmain/pak0.pk3 /legacy/server/etmain/ && \
     rm -rf /tmp/et_full.zip /tmp/et260b.x86_keygen_V03.run /tmp/etmain
 
 RUN git clone --depth 1 --single-branch "https://github.com/Oksii/legacy-configs.git" settings && \
