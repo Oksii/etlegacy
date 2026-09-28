@@ -32,7 +32,7 @@ services:
     container_name: etl-server
     image: oksii/etlegacy:stable
     environment:
-      - 'HOSTNAME=ET Legacy Docker' 
+      - 'SERVER_HOSTNAME=ET Legacy Docker' 
       - 'MAPS=adlernest:braundorf_b4:supply:sw_goldrush_te'
       - 'PASSWORD=etlserver'
     volumes:
@@ -111,7 +111,8 @@ PASSWORD              | Server password.               | ``None``
 RCONPASSWORD          | RCON password.                 | ``None``
 REFPASSWORD           | Referee password.              | ``None``
 SCPASSWORD            | Shoutcaster password.          | ``None``
-HOSTNAME              | Server hostname.               | ``ET Docker Server``
+SERVER_HOSTNAME       | Server hostname.               | ``ETL Docker Server``
+HOSTNAME              | Legacy alias for `SERVER_HOSTNAME`, used when that is unset. Some runtimes (containerd/nerdctl) override `HOSTNAME`, so prefer `SERVER_HOSTNAME`. | ``None``
 CONF_MOTD             | MOTD line on connect. Use `\n` to indicate a new line or change in ``server_motd[%]`` | ``None``
 SVAUTODEMO            | Enable/Disable autodemo record. 0 (off), 1 (on), 2 (only active with players) | ``0``
 SVETLTVMAXSLAVES      | Maximum allowed ETLTV Server slaves | ``2``

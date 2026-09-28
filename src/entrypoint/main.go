@@ -51,9 +51,28 @@ func parseBoolValue(v string, def bool) bool {
 	}
 }
 
+// containerIDRe matches the default hostname Docker, podman and nerdctl assign
+// (the first 12 hex chars of the container ID).
+var containerIDRe = regexp.MustCompile(`^[0-9a-f]{12}$`)
+
+// resolveHostname picks the server name. SERVER_HOSTNAME wins because some
+// runtimes (containerd/nerdctl) overwrite HOSTNAME with the container hostname.
+// HOSTNAME is kept as a legacy alias, but ignored when it is just the
+// runtime-assigned container ID.
+func resolveHostname(serverHostname, hostname, kernelHostname string) string {
+	if serverHostname != "" {
+		return serverHostname
+	}
+	if hostname != "" && !(hostname == kernelHostname && containerIDRe.MatchString(hostname)) {
+		return hostname
+	}
+	return "ETL Docker Server"
+}
+
 func loadConf() map[string]string {
+	kernelHostname, _ := os.Hostname()
 	conf := map[string]string{
-		"HOSTNAME":                      getenv("HOSTNAME", "ETL Docker Server"),
+		"HOSTNAME":                      resolveHostname(os.Getenv("SERVER_HOSTNAME"), os.Getenv("HOSTNAME"), kernelHostname),
 		"MAP_PORT":                      getenv("MAP_PORT", "27960"),
 		"MAP_IP":                        getenv("MAP_IP", ""),
 		"REDIRECTURL":                   getenv("REDIRECTURL", "https://dl.etl.lol/maps/et"),
@@ -911,6 +930,7 @@ func main() {
 	autoUpdate := parseBoolValue(os.Getenv("AUTO_UPDATE"), true)
 	fmt.Printf("Settings source URL: %s\n", conf["SETTINGSURL"])
 	fmt.Printf("Settings branch: %s\n", conf["SETTINGSBRANCH"])
+	fmt.Printf("Server hostname: %s\n", conf["HOSTNAME"])
 	fmt.Printf("AUTO_UPDATE resolved: %t\n", autoUpdate)
 
 	if autoUpdate {

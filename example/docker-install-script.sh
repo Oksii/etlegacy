@@ -1994,7 +1994,7 @@ get_container_status() {
 
     # Get environment variables using grep
     local hostname port password rconpass refpass
-    hostname=$(docker inspect "$container" | grep -Po '"HOSTNAME=\K[^"]*' || echo "-")
+    hostname=$(docker inspect "$container" | grep -Po '"SERVER_HOSTNAME=\K[^"]*' || docker inspect "$container" | grep -Po '"HOSTNAME=\K[^"]*' || echo "-")
     port=$(docker inspect "$container" | grep -Po '"MAP_PORT=\K[^"]*' || echo "-")
     password=$(docker inspect "$container" | grep -Po '"PASSWORD=\K[^"]*' || echo "-")
     rconpass=$(docker inspect "$container" | grep -Po '"RCONPASSWORD=\K[^"]*' || echo "-")
