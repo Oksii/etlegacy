@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 )
 
-// State is what "etltv start/stop" persist across restarts.
 type State struct {
 	Armed bool   `json:"armed"`
 	Tag   string `json:"tag,omitempty"`

@@ -14,8 +14,6 @@ import (
 
 var unsafeNameChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
-// sanitize keeps [A-Za-z0-9._-], replacing anything else with '-', and trims
-// dots and dashes so the result is never a hidden file or "..".
 func sanitize(s string) string {
 	s = unsafeNameChars.ReplaceAllString(s, "-")
 	s = strings.Trim(s, ".-")
@@ -53,8 +51,6 @@ func uniquePath(dir, name string) string {
 	}
 }
 
-// moveFile falls back to copying via dst.tmp across filesystems (the demo dir
-// is often a bind mount), so dst only ever appears complete.
 func moveFile(src, dst string) error {
 	err := os.Rename(src, dst)
 	if err == nil || !errors.Is(err, syscall.EXDEV) {

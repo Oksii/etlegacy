@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// etlded quotes arguments containing spaces itself, so values are passed as-is.
 func slaveArgs(c Config) []string {
 	ip := "127.0.0.1"
 	if c.Public {
@@ -22,7 +21,7 @@ func slaveArgs(c Config) []string {
 	set("fs_homepath", c.homePath())
 	set("net_ip", ip)
 	if !c.Public {
-		set("net_enabled", "1") // IPv4 only, so nothing binds a public v6 address
+		set("net_enabled", "1") // IPv4 only
 	}
 	set("net_port", c.Port)
 	set("sv_maxclients", c.MaxClients)
@@ -45,12 +44,12 @@ func slaveArgs(c Config) []string {
 type eventKind int
 
 const (
-	evNone      eventKind = iota
-	evInit                // "----- Server Initialization ----", the slave is loading a map
-	evMap                 // "Server: <map>", printed right after evInit
-	evRecording           // "Recording to tvdemos/demo0000.tv_84."
-	evStopped             // "Stopped demo."
-	evShutdown            // "----- Server Shutdown (<reason>) -----"
+	evNone eventKind = iota
+	evInit
+	evMap
+	evRecording
+	evStopped
+	evShutdown
 )
 
 type event struct {
@@ -70,7 +69,6 @@ func cleanLine(line string) string {
 	return strings.TrimRight(line, "\r\n ")
 }
 
-// Relayed chat always has a "name: " prefix, so it can't pass for these lines.
 func parseLine(line string) event {
 	line = cleanLine(line)
 	switch {
@@ -89,7 +87,6 @@ func parseLine(line string) event {
 	return event{}
 }
 
-// End reasons recorded with each demo.
 const (
 	reasonMapChange   = "map_change"
 	reasonStop        = "stop"
@@ -100,8 +97,6 @@ const (
 	reasonInterrupted = "interrupted"
 )
 
-// A server shutting down sends a bare "disconnect" ("Server disconnected"); a
-// kick or drop carries its reason ("Server Disconnected - <reason>").
 func shutdownReason(msg string) string {
 	if msg == "Server disconnected" {
 		return reasonQuit

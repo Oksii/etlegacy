@@ -29,19 +29,15 @@ const (
 	connectTimeout = 60 * time.Second
 )
 
-// Process is a started slave.
 type Process interface {
 	Signal(sig syscall.Signal) error
 	Done() <-chan struct{} // closed once the process has been reaped
 }
 
-// StartFunc starts argv with stdout and stderr on out, which the caller closes.
 type StartFunc func(argv []string, out *os.File) (Process, error)
 
-// StatusFunc queries the server.
 type StatusFunc func() (etlproto.Status, error)
 
-// demoMeta describes a finished demo, saved as <demo>.json and sent with the upload.
 type demoMeta struct {
 	Filename   string    `json:"filename"`
 	Map        string    `json:"map"`
@@ -54,8 +50,6 @@ type demoMeta struct {
 	Hostname   string    `json:"hostname"`
 }
 
-// Manager attaches the slave while armed and the server has clients, and moves
-// each finished recording into Config.DemoDir.
 type Manager struct {
 	cfg      Config
 	start    StartFunc
@@ -79,28 +73,27 @@ type Manager struct {
 
 type slaveRun struct {
 	proc    Process
-	done    chan struct{} // closed once its output is drained, it is reaped and its demo finalized
+	done    chan struct{}
 	started time.Time
 
-	recorded   bool   // has started at least one recording
-	requested  bool   // stopped on purpose, so its exit is not a failure
-	termSent   bool   // a second SIGTERM makes etlded skip closing the demo
-	stopReason string // end reason for a recording cut short by the exit
+	recorded   bool
+	requested  bool
+	termSent   bool
+	stopReason string
 
-	expectMap bool // the previous line was evInit, so "Server: " names the map
+	expectMap bool
 	mapName   string
 	rec       *recording
 }
 
 type recording struct {
-	raw     string // as printed by the slave: tvdemos/demo0000.tv_84
+	raw     string // tvdemos/demo0000.tv_84
 	tag     string
 	mapName string
 	started time.Time
-	stopped bool // "Stopped demo." seen; the next line says why
+	stopped bool // "Stopped demo."
 }
 
-// NewManager loads the persisted state. finished may be nil.
 func NewManager(cfg Config, start StartFunc, status StatusFunc, logf func(string, ...any), finished func()) *Manager {
 	file, exists, err := loadState(cfg.statePath())
 	if err != nil {
@@ -125,7 +118,6 @@ func NewManager(cfg Config, start StartFunc, status StatusFunc, logf func(string
 	}
 }
 
-// Run attaches and detaches the slave until ctx is done.
 func (m *Manager) Run(ctx context.Context) {
 	m.sweepLeftovers()
 	if m.state.Armed {
@@ -162,7 +154,7 @@ func (m *Manager) tick() {
 
 	st, err := m.status()
 	if err != nil {
-		return // also how it waits for the server to come up after boot
+		return
 	}
 	players := st.PlayersExcluding(m.cfg.Name) // bots count, as for autorestart
 
@@ -180,7 +172,7 @@ func (m *Manager) tick() {
 	case !run.recorded && m.now().Sub(run.started) > m.connectTimeout():
 		m.logf("slave has not started recording after %s", m.connectTimeout())
 		run.stopReason = reasonDisconnect
-		m.endLocked(run) // not requested: its exit schedules a retry
+		m.endLocked(run)
 	case m.cfg.IdleDetach <= 0 || players > 0:
 		m.emptySince = time.Time{}
 	case m.emptySince.IsZero():
@@ -266,8 +258,6 @@ func (m *Manager) handleLine(run *slaveRun, line string) {
 		}
 	case evShutdown:
 		if !run.termSent {
-			// Dropped by the server. etlded has no reconnect, so end it and
-			// let tick attach a new one.
 			run.stopReason = shutdownReason(ev.value)
 			m.logf("disconnected from the server (%s)", ev.value)
 			m.endLocked(run)
@@ -351,8 +341,6 @@ func (m *Manager) endLocked(run *slaveRun) {
 	}()
 }
 
-// Shutdown stops the slave for good and waits for its demo. reason is "quit"
-// when the server exited, "shutdown" when the container is stopping.
 func (m *Manager) Shutdown(reason string) {
 	m.mu.Lock()
 	if !m.closed {
@@ -374,7 +362,6 @@ func (m *Manager) Shutdown(reason string) {
 	}
 }
 
-// The slave's game dir is the server's fs_game, "legacy" unless a mod is set.
 func (m *Manager) rawPath(raw string) string {
 	home := m.cfg.homePath()
 	if p := filepath.Join(home, "legacy", raw); fileExists(p) {
@@ -446,7 +433,6 @@ func (m *Manager) sweepLeftovers() {
 	}
 }
 
-// Handle serves a control request.
 func (m *Manager) Handle(req Request) Response {
 	switch req.Cmd {
 	case "start":
@@ -507,7 +493,6 @@ func (m *Manager) cmdStop() Response {
 	m.state, m.source = State{}, sourceStateFile
 	msg := "ETLTV disarmed (state file)"
 	if m.run != nil {
-		// Without waiting: the Lua hook calls this from inside a server frame.
 		m.requestStopLocked(m.run, reasonStop)
 		m.endLocked(m.run)
 		msg += ", stopping the recorder and saving the current demo"
@@ -534,7 +519,6 @@ func (m *Manager) cmdReset() Response {
 	return Response{OK: true, Message: "state file removed; " + describe(info), Status: &info}
 }
 
-// Status reports the recorder's current state.
 func (m *Manager) Status() StatusInfo {
 	m.mu.Lock()
 	defer m.mu.Unlock()

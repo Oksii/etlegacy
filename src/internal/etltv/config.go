@@ -1,5 +1,3 @@
-// Package etltv runs an ETLTV slave beside the server to record matches as .tv
-// demos, one per map, and optionally relay them to spectators.
 package etltv
 
 import (
@@ -7,13 +5,12 @@ import (
 	"time"
 )
 
-// DefaultSocket is where the supervisor listens for control requests.
 const DefaultSocket = "/tmp/etlsupervisor.sock"
 
 type Config struct {
 	Etlded   string
 	BasePath string
-	StateDir string 
+	StateDir string
 	DemoDir  string // finished demos
 
 	MasterPort     string

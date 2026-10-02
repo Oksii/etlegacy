@@ -14,9 +14,7 @@ import (
 	"time"
 )
 
-// Uploader POSTs finished demos to UploadURL. A demo counts as done once
-// <demo>.uploaded exists, written after a 2xx, so an upload cut off by a
-// restart is retried on the next boot.
+// Uploader POSTs finished demos to UploadURL.
 type Uploader struct {
 	url, token string
 	dir        string
@@ -25,7 +23,6 @@ type Uploader struct {
 	notify     chan struct{}
 }
 
-// NewUploader returns nil when no upload URL is configured.
 func NewUploader(cfg Config, logf func(string, ...any)) *Uploader {
 	if cfg.UploadURL == "" {
 		return nil
@@ -40,7 +37,6 @@ func NewUploader(cfg Config, logf func(string, ...any)) *Uploader {
 	}
 }
 
-// Notify wakes the uploader after a demo has been finished.
 func (u *Uploader) Notify() {
 	select {
 	case u.notify <- struct{}{}:
@@ -48,7 +44,6 @@ func (u *Uploader) Notify() {
 	}
 }
 
-// Run uploads pending demos until ctx is done.
 func (u *Uploader) Run(ctx context.Context) {
 	failures := 0
 	for {
@@ -84,7 +79,6 @@ func retryDelay(failures int) time.Duration {
 	return d
 }
 
-// drain stops at the first failure so the backoff applies.
 func (u *Uploader) drain(ctx context.Context) error {
 	for _, path := range pendingDemos(u.dir) {
 		if err := u.upload(ctx, path); err != nil {
@@ -124,7 +118,6 @@ func isDemoFile(name string) bool {
 	return strings.HasPrefix(filepath.Ext(name), ".tv_")
 }
 
-// upload streams the multipart body, so a long match is never held in memory.
 func (u *Uploader) upload(ctx context.Context, path string) error {
 	meta := readMeta(path)
 
