@@ -204,9 +204,7 @@ func loadConf() map[string]string {
 	return conf
 }
 
-// defaultETLTVPort is MAP_PORT+10. Hosts usually number their servers
-// 27960, 27961, ..., so +1 would collide with the next server's port once the
-// relay is published, while +10 leaves room for ten servers.
+// MAP_PORT+10 stays clear of servers numbered 27960, 27961, ... on one host.
 func defaultETLTVPort(mapPort string) string {
 	port, err := strconv.Atoi(mapPort)
 	if err != nil {

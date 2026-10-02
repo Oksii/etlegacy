@@ -51,8 +51,7 @@ func check(addr, port string, maxPlayers int) int {
 	}
 
 	players := status.Players
-	// An attached ETLTV slave is a client on the server but not a player;
-	// counting it would keep an armed server from ever restarting or updating.
+	// An attached ETLTV slave is a client but not a player.
 	if resp, err := etltv.Call(etltv.DefaultSocket, etltv.Request{Cmd: "status"}, time.Second); err == nil && resp.Status != nil && resp.Status.Attached {
 		players = status.PlayersExcluding(resp.Status.Name)
 		fmt.Printf("Current player count: %d (excluding ETLTV)\n", players)

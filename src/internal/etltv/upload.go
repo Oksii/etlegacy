@@ -14,11 +14,9 @@ import (
 	"time"
 )
 
-// Uploader POSTs finished demos to UploadURL. It only ever sees complete
-// files: demos appear in DemoDir by rename once the slave has closed them.
-// A file counts as done once <demo>.uploaded exists, which is written only
-// after a 2xx response, so anything interrupted by a restart is retried on the
-// next boot.
+// Uploader POSTs finished demos to UploadURL. A demo counts as done once
+// <demo>.uploaded exists, written after a 2xx, so an upload cut off by a
+// restart is retried on the next boot.
 type Uploader struct {
 	url, token string
 	dir        string
@@ -86,8 +84,7 @@ func retryDelay(failures int) time.Duration {
 	return d
 }
 
-// drain uploads every pending demo, oldest name first, and stops at the first
-// failure so the backoff applies.
+// drain stops at the first failure so the backoff applies.
 func (u *Uploader) drain(ctx context.Context) error {
 	for _, path := range pendingDemos(u.dir) {
 		if err := u.upload(ctx, path); err != nil {
@@ -102,7 +99,6 @@ func (u *Uploader) drain(ctx context.Context) error {
 	return nil
 }
 
-// pendingDemos lists finished demos in dir that have no .uploaded marker.
 func pendingDemos(dir string) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -124,14 +120,11 @@ func pendingDemos(dir string) []string {
 	return out
 }
 
-// isDemoFile matches "<name>.tv_<protocol>", not its .json/.uploaded/.tmp
-// companions.
 func isDemoFile(name string) bool {
 	return strings.HasPrefix(filepath.Ext(name), ".tv_")
 }
 
-// upload streams the demo as multipart/form-data, so even a long match is
-// never held in memory.
+// upload streams the multipart body, so a long match is never held in memory.
 func (u *Uploader) upload(ctx context.Context, path string) error {
 	meta := readMeta(path)
 
@@ -163,7 +156,7 @@ func (u *Uploader) upload(ctx context.Context, path string) error {
 	return nil
 }
 
-func writeForm(mw *multipart.Writer, meta Meta, path string) error {
+func writeForm(mw *multipart.Writer, meta demoMeta, path string) error {
 	fields := [][2]string{
 		{"filename", meta.Filename},
 		{"map", meta.Map},
@@ -203,10 +196,8 @@ func formatTime(t time.Time) string {
 	return t.Format(time.RFC3339)
 }
 
-// readMeta loads <demo>.json, falling back to just the file name if it is
-// missing or unreadable.
-func readMeta(path string) Meta {
-	meta := Meta{Filename: filepath.Base(path)}
+func readMeta(path string) demoMeta {
+	var meta demoMeta
 	if data, err := os.ReadFile(path + ".json"); err == nil {
 		json.Unmarshal(data, &meta)
 	}

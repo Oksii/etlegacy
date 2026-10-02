@@ -263,6 +263,8 @@ so the server browser shows no lock.
   core first, and it only runs while recording is armed and someone is on the server.
 - ``SVETLTVPASSWORD`` defaults to the publicly known ``3tltv``. Anyone who knows it can attach their own ETLTV slave and
   spectate with full information, so set your own on competitive servers.
+- ``etlutil tv start``/``stop`` persist in `/legacy/homepath/etltv`, which is lost if the container is recreated (e.g. by
+  Watchtower) unless that path is mounted. ``ETLTV_AUTOSTART`` needs no state.
 - To own the slave, the container's entrypoint stays PID 1 and runs `etlded` as its child. Exit codes, `rcon quit`
   restarts and `docker attach` work as before.
 

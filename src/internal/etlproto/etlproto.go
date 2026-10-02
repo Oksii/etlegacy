@@ -24,14 +24,11 @@ type Status struct {
 	Map        string
 	Players    int
 	MaxClients int
-	// Names holds each connected client's color-stripped name, in the order
-	// the server listed them.
-	Names []string
+	Names      []string // color-stripped
 }
 
-// PlayersExcluding returns the client count without one client named name.
-// Only a single match is dropped, so a player who copies the name cannot hide
-// a second client. Names compare without color codes, as Names holds them.
+// PlayersExcluding returns the client count without one client named name,
+// colors ignored. Only one match is dropped, so a copied name hides no one else.
 func (s Status) PlayersExcluding(name string) int {
 	name = StripColors(name)
 	if name == "" {
@@ -115,8 +112,7 @@ func ParseStatus(resp []byte) (Status, error) {
 	return s, nil
 }
 
-// playerName extracts the quoted name from a status player line. The name
-// itself may contain quotes, so it runs from the first quote to the last.
+// The name may itself contain quotes, so it runs from the first to the last.
 func playerName(line string) string {
 	first := strings.IndexByte(line, '"')
 	last := strings.LastIndexByte(line, '"')

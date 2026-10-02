@@ -5,8 +5,7 @@ import (
 	"strings"
 )
 
-// slaveArgs is the argv for the slave. etlded quotes any argument containing
-// spaces when it rebuilds its command line, so values are passed as-is.
+// etlded quotes arguments containing spaces itself, so values are passed as-is.
 func slaveArgs(c Config) []string {
 	ip := "127.0.0.1"
 	if c.Public {
@@ -65,17 +64,13 @@ var (
 	timePrefix = regexp.MustCompile(`^ *-?[0-9]+ `)
 )
 
-// cleanLine strips the server-time column and the ANSI colors (com_ansiColor)
-// that etlded adds to its console output.
 func cleanLine(line string) string {
 	line = ansiEscape.ReplaceAllString(line, "")
 	line = timePrefix.ReplaceAllString(line, "")
 	return strings.TrimRight(line, "\r\n ")
 }
 
-// parseLine recognises the slave console lines that drive the recorder.
-// Chat and other relayed text always carries a "name: " prefix, so it cannot
-// pass for one of these.
+// Relayed chat always has a "name: " prefix, so it can't pass for these lines.
 func parseLine(line string) event {
 	line = cleanLine(line)
 	switch {
@@ -105,10 +100,8 @@ const (
 	reasonInterrupted = "interrupted"
 )
 
-// shutdownReason maps the slave's shutdown message to an end reason. When the
-// master shuts down (rcon quit, crash) it sends a bare "disconnect", which the
-// slave reports as "Server disconnected". A kick or drop carries the reason:
-// "Server Disconnected - <reason>".
+// A server shutting down sends a bare "disconnect" ("Server disconnected"); a
+// kick or drop carries its reason ("Server Disconnected - <reason>").
 func shutdownReason(msg string) string {
 	if msg == "Server disconnected" {
 		return reasonQuit

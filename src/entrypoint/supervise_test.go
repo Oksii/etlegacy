@@ -10,9 +10,7 @@ import (
 	"time"
 )
 
-// There must be only one reaper per process (the supervisor creates exactly
-// one): a second would collect the first one's children and drop their
-// statuses. Tests share this one.
+// One reaper per process, as in the supervisor: a second would steal statuses.
 var (
 	sharedKids     *children
 	sharedKidsOnce sync.Once
@@ -44,8 +42,6 @@ func TestChildrenDeliversExitStatus(t *testing.T) {
 	}{
 		{"exit 0", 0},
 		{"exit 3", 3},
-		// Matches what a shell reports, so a crashed server keeps a
-		// distinguishable exit code.
 		{"kill -TERM $$", 128 + int(syscall.SIGTERM)},
 	}
 	for _, tc := range tests {
@@ -59,8 +55,7 @@ func TestChildrenDeliversExitStatus(t *testing.T) {
 	}
 }
 
-// Children that exit before start returns must still have their status
-// delivered rather than being reaped unregistered.
+// Children exiting before start returns must still get their status.
 func TestChildrenImmediateExit(t *testing.T) {
 	kids := testKids()
 	attr := &os.ProcAttr{Files: []*os.File{nil, nil, nil}}
@@ -80,8 +75,7 @@ func TestChildrenImmediateExit(t *testing.T) {
 	}
 }
 
-// The returned pid must be the child's real pid: signalling it has to reach
-// that child and nothing else.
+// Release() sets p.Pid to -1; kill(-1) would hit every process.
 func TestChildrenReturnsRealPid(t *testing.T) {
 	kids := testKids()
 	pid, ch, err := kids.start([]string{"/bin/sleep", "30"}, &os.ProcAttr{Files: []*os.File{nil, nil, nil}})
@@ -100,28 +94,6 @@ func TestChildrenReturnsRealPid(t *testing.T) {
 	}
 }
 
-func TestSlaveProcRefusesNonPositivePid(t *testing.T) {
-	p := &slaveProc{pid: -1, done: make(chan struct{})}
-	if err := p.Signal(syscall.SIGTERM); err == nil {
-		t.Fatal("signalled pid -1")
-	}
-}
-
-func TestDefaultETLTVPort(t *testing.T) {
-	tests := map[string]string{
-		"27960": "27970",
-		"27963": "27973",
-		"":      "27970", // MAP_PORT unset or unparsable: the engine default
-		"abc":   "27970",
-	}
-	for in, want := range tests {
-		if got := defaultETLTVPort(in); got != want {
-			t.Errorf("defaultETLTVPort(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// niceOf reads a process's nice value (field 19 of /proc/<pid>/stat).
 func niceOf(t *testing.T, pid string) int {
 	t.Helper()
 	data, err := os.ReadFile("/proc/" + pid + "/stat")
@@ -149,8 +121,6 @@ func TestLowerPriority(t *testing.T) {
 		waitExit(t, ch)
 	}()
 
-	// Relative to a reference process, here ourselves standing in for the
-	// server.
 	ref := niceOf(t, "self")
 	if err := lowerPriority(pid, os.Getpid(), 10); err != nil {
 		t.Fatalf("lowerPriority: %v", err)

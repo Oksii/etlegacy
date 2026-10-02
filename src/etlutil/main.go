@@ -75,8 +75,8 @@ func main() {
 	}
 }
 
-// tv forwards a command to the supervisor's ETLTV recorder. It is also what
-// the Lua rcon hook runs, so it must answer quickly: the server frame waits.
+// tv forwards a command to the supervisor's ETLTV recorder. The Lua rcon hook
+// runs it from inside a server frame, hence the short timeout.
 func tv(args []string) {
 	if len(args) == 0 {
 		usage()
@@ -92,7 +92,7 @@ func tv(args []string) {
 		usage()
 	}
 
-	resp, err := etltv.Call(etltv.DefaultSocket, req, 5*time.Second)
+	resp, err := etltv.Call(etltv.DefaultSocket, req, 2*time.Second)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ETLTV: supervisor not reachable on %s: %v\n", etltv.DefaultSocket, err)
 		os.Exit(1)

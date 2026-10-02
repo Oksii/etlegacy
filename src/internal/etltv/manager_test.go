@@ -13,8 +13,7 @@ import (
 	"github.com/oksii/etlegacy/src/internal/etlproto"
 )
 
-// fakeSlave stands in for the slave etlded: the test prints console lines
-// for it, and it records the signals the manager sends.
+// fakeSlave prints console lines for the test and records the signals it gets.
 type fakeSlave struct {
 	out  *os.File
 	done chan struct{}
@@ -107,10 +106,7 @@ func newHarnessWith(t *testing.T, cfg Config) *harness {
 		return etlproto.Status{Players: len(h.players), Names: append([]string(nil), h.players...)}, nil
 	}
 
-	m, err := NewManager(cfg, start, status, t.Logf, nil)
-	if err != nil {
-		t.Fatalf("NewManager: %v", err)
-	}
+	m := NewManager(cfg, start, status, t.Logf, nil)
 	m.now = func() time.Time {
 		h.mu.Lock()
 		defer h.mu.Unlock()
@@ -118,8 +114,7 @@ func newHarnessWith(t *testing.T, cfg Config) *harness {
 	}
 	h.m = m
 	t.Cleanup(func() {
-		// Fakes don't react to signals, so end them before shutting down
-		// rather than waiting out the SIGTERM and SIGKILL graces.
+		// Fakes ignore signals: end them first instead of waiting out the graces.
 		h.mu.Lock()
 		for _, f := range h.started {
 			f.exit()
@@ -164,7 +159,6 @@ func (h *harness) expectNoAttach() {
 	}
 }
 
-// writeRaw creates a demo the way the slave would.
 func (h *harness) writeRaw(name string) {
 	h.t.Helper()
 	dir := filepath.Join(h.cfg.homePath(), "legacy", "tvdemos")
@@ -180,12 +174,11 @@ func (h *harness) recordMap(f *fakeSlave, mapName, raw string) {
 	eventually(h.t, "recording "+raw, func() bool { return h.m.Status().Recording == raw })
 }
 
-// finished waits for a demo in DemoDir and returns its metadata.
-func (h *harness) finished(name string) Meta {
+func (h *harness) finished(name string) demoMeta {
 	h.t.Helper()
 	path := filepath.Join(h.cfg.DemoDir, name)
 	eventually(h.t, "demo "+name, func() bool { return fileExists(path) })
-	var meta Meta
+	var meta demoMeta
 	data, err := os.ReadFile(path + ".json")
 	if err != nil {
 		h.t.Fatalf("metadata: %v", err)
@@ -261,7 +254,7 @@ func TestKickRespawnsWithBackoff(t *testing.T) {
 	h.recordMap(f, "supply", "demo0000.tv_84")
 
 	f.say("Stopped demo.", "----- Server Shutdown (Server Disconnected - was kicked) -----")
-	expectSignal(t, f, syscall.SIGTERM) // the idle slave is ended
+	expectSignal(t, f, syscall.SIGTERM)
 	f.exit()
 
 	meta := h.finished("2026-10-02_213000_supply.tv_84")
@@ -281,8 +274,7 @@ func TestMasterQuitSignalsOnce(t *testing.T) {
 	f := h.attach()
 	h.recordMap(f, "supply", "demo0000.tv_84")
 
-	// rcon quit: the master sends a bare disconnect, then exits, and the
-	// supervisor calls Shutdown.
+	// rcon quit: a disconnect, then the supervisor calls Shutdown.
 	f.say("Stopped demo.", "----- Server Shutdown (Server disconnected) -----")
 	expectSignal(t, f, syscall.SIGTERM)
 	go func() {
@@ -305,7 +297,7 @@ func TestMasterQuitSignalsOnce(t *testing.T) {
 func TestIdleDetachIgnoresTheSlave(t *testing.T) {
 	h := newHarness(t, true)
 
-	h.setPlayers("ETLTV") // a leftover slave on the master is not a player
+	h.setPlayers("ETLTV") // not a player
 	h.expectNoAttach()
 
 	h.setPlayers("player", "ETLTV")
@@ -400,8 +392,8 @@ func TestSweepsLeftoversAtBoot(t *testing.T) {
 	}
 }
 
-// Seen with etlded 2.86: when the master drops it, the slave closes its demo
-// and then dies in its filesystem restart, without a "Server Shutdown" line.
+// a dropped slave closes its demo, then dies in its filesystem
+// restart without printing "Server Shutdown".
 func TestSlaveCrashOnServerQuit(t *testing.T) {
 	h := newHarness(t, true)
 	h.setPlayers("player")
@@ -409,7 +401,7 @@ func TestSlaveCrashOnServerQuit(t *testing.T) {
 	h.recordMap(f, "oasis", "demo0000.tv_84")
 
 	f.say(`broadcast: print "Server quit"`, "Stopped demo.", "----- Initializing Filesystem --")
-	f.exit() // gone before the supervisor has noticed the server exit
+	f.exit()
 	time.Sleep(100 * time.Millisecond)
 	h.m.Shutdown(reasonQuit)
 
@@ -437,9 +429,8 @@ func TestSlaveCrashOnKick(t *testing.T) {
 	h.attach() // and it comes back
 }
 
-// etlded can deadlock in its own SIGTERM handler. After an unexpected
-// disconnect the manager must escalate to SIGKILL, or the dead slave would
-// block every reattach.
+// etlded can deadlock in its SIGTERM handler; without SIGKILL the hung slave
+// would block every reattach.
 func TestHungSlaveIsKilled(t *testing.T) {
 	h := newHarness(t, true)
 	h.setPlayers("player")
@@ -448,7 +439,7 @@ func TestHungSlaveIsKilled(t *testing.T) {
 
 	f.say("Stopped demo.", "----- Server Shutdown (Server Disconnected - player kicked) -----")
 	expectSignal(t, f, syscall.SIGTERM)
-	f.say("----- Server Shutdown (Received signal 15) -----") // and then it hangs
+	f.say("----- Server Shutdown (Received signal 15) -----")
 	expectSignal(t, f, syscall.SIGKILL)
 	f.exit()
 

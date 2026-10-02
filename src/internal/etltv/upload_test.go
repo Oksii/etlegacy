@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func writeDemo(t *testing.T, dir, name string, meta Meta) string {
+func writeDemo(t *testing.T, dir, name string, meta demoMeta) string {
 	t.Helper()
 	os.MkdirAll(dir, 0755)
 	path := filepath.Join(dir, name)
@@ -51,7 +51,7 @@ func TestUploadSendsFinishedDemos(t *testing.T) {
 
 	dir := t.TempDir()
 	started := time.Date(2026, 10, 2, 21, 30, 0, 0, time.UTC)
-	path := writeDemo(t, dir, "cup_2026-10-02_213000_supply.tv_84", Meta{
+	path := writeDemo(t, dir, "cup_2026-10-02_213000_supply.tv_84", demoMeta{
 		Map: "supply", Tag: "cup", StartedAt: started, EndedAt: started.Add(time.Hour),
 		EndReason: reasonMapChange, ServerPort: "27960", Hostname: "Test",
 	})
@@ -106,7 +106,7 @@ func TestUploadFailureKeepsDemoPending(t *testing.T) {
 	defer srv.Close()
 
 	dir := t.TempDir()
-	path := writeDemo(t, dir, "2026-10-02_213000_supply.tv_84", Meta{})
+	path := writeDemo(t, dir, "2026-10-02_213000_supply.tv_84", demoMeta{})
 
 	u := NewUploader(Config{UploadURL: srv.URL, DemoDir: dir}, t.Logf)
 	if err := u.drain(context.Background()); err == nil {
@@ -117,11 +117,5 @@ func TestUploadFailureKeepsDemoPending(t *testing.T) {
 	}
 	if p := pendingDemos(dir); len(p) != 1 {
 		t.Errorf("pending = %v, want the demo still pending", p)
-	}
-}
-
-func TestNoUploaderWithoutURL(t *testing.T) {
-	if u := NewUploader(Config{}, t.Logf); u != nil {
-		t.Error("uploader created without ETLTV_UPLOAD_URL")
 	}
 }

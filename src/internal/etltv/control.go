@@ -9,37 +9,29 @@ import (
 	"time"
 )
 
-// Request is one control command: "start" (with an optional tag), "stop",
-// "reset" or "status".
+// Request is one control command: "start" (optional tag), "stop", "reset" or "status".
 type Request struct {
 	Cmd string `json:"cmd"`
 	Tag string `json:"tag,omitempty"`
 }
 
-// Response answers a Request. Message is a single human-readable line, which
-// is what etlutil prints and the Lua hook relays to the rcon caller.
 type Response struct {
 	OK      bool        `json:"ok"`
 	Message string      `json:"message"`
 	Status  *StatusInfo `json:"status,omitempty"`
 }
 
-// StatusInfo describes the recorder.
 type StatusInfo struct {
-	Armed  bool   `json:"armed"`
-	Source string `json:"source"` // what decided Armed: the state file or ETLTV_AUTOSTART
-	Tag    string `json:"tag,omitempty"`
-	Name   string `json:"name"` // the slave's client name on the master
-	// Attached is true while a slave process runs, whether it is still
-	// connecting or already recording.
+	Armed     bool      `json:"armed"`
+	Source    string    `json:"source"`
+	Tag       string    `json:"tag,omitempty"`
+	Name      string    `json:"name"`
 	Attached  bool      `json:"attached"`
 	Recording string    `json:"recording,omitempty"`
 	Map       string    `json:"map,omitempty"`
 	Since     time.Time `json:"since,omitempty"`
 }
 
-// Listen serves control requests on a unix socket at path, replacing any stale
-// socket left by a previous run.
 func Listen(path string, handle func(Request) Response) (net.Listener, error) {
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -72,7 +64,6 @@ func serveConn(conn net.Conn, handle func(Request) Response) {
 	json.NewEncoder(conn).Encode(handle(req))
 }
 
-// Call sends one request to the supervisor.
 func Call(path string, req Request, timeout time.Duration) (Response, error) {
 	conn, err := net.DialTimeout("unix", path, timeout)
 	if err != nil {
