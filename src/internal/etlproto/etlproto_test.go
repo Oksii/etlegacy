@@ -245,3 +245,48 @@ func TestRconBadPasswordIsReturnedVerbatim(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestParseStatusNames(t *testing.T) {
+	resp := statusResponse(realInfostring,
+		`10 45 "^1Pl^7ayer"`,
+		`0 0 "ETLTV"`,
+		`3 80 "say "hi""`,
+	)
+	got, err := ParseStatus(resp[len(oobPrefix):])
+	if err != nil {
+		t.Fatalf("ParseStatus: %v", err)
+	}
+	want := []string{"Player", "ETLTV", `say "hi"`}
+	if len(got.Names) != len(want) {
+		t.Fatalf("names = %q, want %q", got.Names, want)
+	}
+	for i := range want {
+		if got.Names[i] != want[i] {
+			t.Errorf("names[%d] = %q, want %q", i, got.Names[i], want[i])
+		}
+	}
+}
+
+func TestPlayersExcluding(t *testing.T) {
+	tests := []struct {
+		name    string
+		names   []string
+		exclude string
+		want    int
+	}{
+		{"no match", []string{"a", "b"}, "ETLTV", 2},
+		{"one match", []string{"a", "ETLTV"}, "ETLTV", 1},
+		{"only the slave", []string{"ETLTV"}, "ETLTV", 0},
+		// A player renaming themselves must not hide a second client.
+		{"duplicate name drops one", []string{"ETLTV", "ETLTV"}, "ETLTV", 1},
+		{"empty exclude", []string{"a"}, "", 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := Status{Players: len(tc.names), Names: tc.names}
+			if got := s.PlayersExcluding(tc.exclude); got != tc.want {
+				t.Errorf("PlayersExcluding(%q) = %d, want %d", tc.exclude, got, tc.want)
+			}
+		})
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/oksii/etlegacy/src/internal/etlproto"
+	"github.com/oksii/etlegacy/src/internal/etltv"
 )
 
 func main() {
@@ -49,10 +50,18 @@ func check(addr, port string, maxPlayers int) int {
 		return 1
 	}
 
-	fmt.Printf("Current player count: %d\n", status.Players)
+	players := status.Players
+	// An attached ETLTV slave is a client on the server but not a player;
+	// counting it would keep an armed server from ever restarting or updating.
+	if resp, err := etltv.Call(etltv.DefaultSocket, etltv.Request{Cmd: "status"}, time.Second); err == nil && resp.Status != nil && resp.Status.Attached {
+		players = status.PlayersExcluding(resp.Status.Name)
+		fmt.Printf("Current player count: %d (excluding ETLTV)\n", players)
+	} else {
+		fmt.Printf("Current player count: %d\n", players)
+	}
 
-	if status.Players > maxPlayers {
-		fmt.Printf("Players active (%d/%d). Skipping restart.\n", status.Players, maxPlayers)
+	if players > maxPlayers {
+		fmt.Printf("Players active (%d/%d). Skipping restart.\n", players, maxPlayers)
 		return 1
 	}
 

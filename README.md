@@ -23,6 +23,7 @@ By default this is [legacy-configs](https://github.com/Oksii/legacy-configs)
 - Tag `stable` is recommended for competitive play and actively maintained. 
 - Automatic builds triggered by [ET:Legacy snapshot](https://www.etlegacy.com/workflow-files) releases
 - Available tags listed on [Docker Hub](https://hub.docker.com/r/oksii/etlegacy)
+- Can record matches as ETLTV demos on demand, and optionally relay them to spectators (see [ETLTV recording](#etltv-recording)).
 - Includes a built-in `autorestart` daemon that periodically checks player count and sends a restart signal when the server is empty (or below the configured threshold). Enabled by default, runs every 2 hours. Can also be invoked as a one-shot command (e.g. via Watchtower lifecycle hook).
 # Usage
 ## docker-compose (Recommended)
@@ -115,7 +116,7 @@ SERVER_HOSTNAME       | Server hostname.               | ``ETL Docker Server``
 HOSTNAME              | Legacy alias for `SERVER_HOSTNAME`, used when that is unset. Some runtimes (containerd/nerdctl) override `HOSTNAME`, so prefer `SERVER_HOSTNAME`. | ``None``
 CONF_MOTD             | MOTD line on connect. Use `\n` to indicate a new line or change in ``server_motd[%]`` | ``None``
 SVAUTODEMO            | Enable/Disable autodemo record. 0 (off), 1 (on), 2 (only active with players) | ``0``
-SVETLTVMAXSLAVES      | Maximum allowed ETLTV Server slaves | ``2``
+SVETLTVMAXSLAVES      | Maximum allowed ETLTV Server slaves. The built-in recorder uses one (see [ETLTV recording](#etltv-recording)) | ``2``
 SVETLTVPASSWORD       | Password used by ETLTV slaves to connect | ```3tltv```
 SERVERCONF            | Server config to load on startup | ``legacy6``
 
@@ -184,6 +185,83 @@ Extra configuration can be prepended to the `etl_server.cfg` by mounting a
 configuration at `/legacy/server/extra.cfg`.
 This is generally not recommended, try to use the variables above where
 possible or create a custom `SETTINGSURL`.
+
+# ETLTV recording
+The server can record matches as ETLTV demos (`.tv_84`). The ET: Legacy client plays these natively with
+`/tv demo <name>` (put the file in `legacy/tvdemos/`; `/tv ff <seconds>` skips ahead).
+A second `etlded` joins the server as an ETLTV slave and records one demo per map. It is a shoutcaster, so it sees both teams.
+Warmup and both stopwatch rounds of a map end up in the same file.
+
+Recording is armed on demand. It stays armed across restarts, including the `rcon quit` restart, until it is disarmed:
+
+Command | Effect
+------- | ------
+``docker exec <container> ./etlutil tv start [tag]`` | Arm recording. The optional tag (``A-Z a-z 0-9 . _ -``, e.g. a match ID) prefixes the demo names
+``docker exec <container> ./etlutil tv stop`` | Disarm, and save the demo being recorded
+``docker exec <container> ./etlutil tv status`` | Show whether recording is armed and what is being recorded
+``docker exec <container> ./etlutil tv reset`` | Forget start/stop and go back to ``ETLTV_AUTOSTART``
+
+A settings repository can also expose these commands over rcon (``rcon etltv start [tag]``, etc.). To do that, its Lua handles the
+`etltv` console command by running `/legacy/server/etlutil tv ...` and printing the result.
+
+While armed, the slave joins when the first client connects. It leaves again after ``ETLTV_IDLE_DETACH`` seconds with nobody on the server.
+If the server drops it (a kick, a failed map change), it reconnects with a back-off.
+It does not count as a player for the autorestart daemon or the Watchtower hook.
+
+Finished demos are named ``[tag_]YYYY-MM-DD_HHMMSS_<map>.tv_84``. They land in ``ETLTV_DEMO_DIR`` next to a `.json` file describing them.
+Bind-mount that directory to keep the demos on the host:
+```yaml
+    volumes:
+      - ./tvdemos:/legacy/homepath/tvdemos
+```
+
+Environment Variable  | Description                    | Defaults
+--------------------- | ------------------------------ | ------------------------
+ETLTV_AUTOSTART       | Arm recording on boot when ``etlutil tv start``/``stop`` has not been used (or after ``reset``) | ``false``
+ETLTV_IDLE_DETACH     | Seconds with no clients before the slave leaves. ``0`` = never | ``120``
+ETLTV_DEMO_DIR        | Where finished demos are stored | ``/legacy/homepath/tvdemos``
+ETLTV_UPLOAD_URL      | Upload each finished demo to this URL (see below) | ``None``
+ETLTV_UPLOAD_TOKEN    | Bearer token sent with uploads | ``None``
+ETLTV_NAME            | Name the slave uses on the server | ``ETLTV``
+ETLTV_PUBLIC          | Let clients connect to the slave to spectate (see below) | ``false``
+ETLTV_PORT            | Port of the slave | ``MAP_PORT`` + 1
+ETLTV_MAXCLIENTS      | Spectator slots on the slave | ``10``
+ETLTV_VIEWERPASSWORD  | Password spectators need to join the slave | ``None``
+ETLTV_DELAY           | Delay the slave's feed by this many seconds (``sv_etltv_delay``). This delays the recording too | ``0``
+
+### Uploads
+When ``ETLTV_UPLOAD_URL`` is set, each demo is uploaded once it is complete, never while it is still being written.
+The upload is a `multipart/form-data` POST:
+- field `file`, the demo
+- fields `filename`, `map`, `tag`, `started_at`, `ended_at`, `end_reason`, `server_ip`, `server_port` and `hostname`
+- header ``Authorization: Bearer <ETLTV_UPLOAD_TOKEN>``
+
+`end_reason` is one of the following:
+- `map_change`
+- `stop` (``etltv stop``)
+- `idle` (server empty)
+- `quit` (the server quit, e.g. `rcon quit`)
+- `shutdown` (the container was stopped)
+- `disconnect` (the server dropped the slave)
+- `interrupted` (left over from an unclean exit)
+
+Any 2xx response marks the demo as uploaded, and `<demo>.uploaded` is written beside it. The local copy is kept.
+Failed uploads are retried with a back-off.
+Uploads never hold up a restart: one cut off by a restart is retried after the next boot.
+
+### Spectator relay
+With ``ETLTV_PUBLIC=true``, clients can connect to the slave on ``ETLTV_PORT`` to spectate. Publish that port, e.g.
+``'27961:27961/udp'``. Spectators see both teams, the same as a shoutcaster. On competitive servers, use
+``ETLTV_DELAY`` and/or ``ETLTV_VIEWERPASSWORD``. The slave enforces the viewer password but does not advertise it,
+so the server browser shows no lock.
+
+### Notes
+- The slave takes one of the top ``SVETLTVMAXSLAVES`` client slots. If players fill those slots, it waits for one to free up.
+- The slave joins with ``PASSWORD``. If `g_password` is changed at runtime, the slave can't join.
+- ``SVETLTVPASSWORD`` defaults to the publicly known ``3tltv``. Anyone who knows it can attach their own ETLTV slave and
+  spectate with full information, so set your own on competitive servers.
+- To own the slave, the container's entrypoint stays PID 1 and runs `etlded` as its child. Exit codes, `rcon quit`
+  restarts and `docker attach` work as before.
 
 # Further examples: 
 ## watchtower integration

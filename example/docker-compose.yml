@@ -7,8 +7,12 @@ services:
       - 'SERVER_HOSTNAME=ETLDocker Stable' 
     volumes:
       - ./maps:/maps
+      # ETLTV demos (etlutil tv start / rcon etltv start)
+      # - ./tvdemos:/legacy/homepath/tvdemos
     ports:
       - '27960:27960/udp'
+      # ETLTV spectator relay, with ETLTV_PUBLIC=true
+      # - '27961:27961/udp'
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "com.centurylinklabs.watchtower.lifecycle.pre-update=/legacy/server/autorestart"

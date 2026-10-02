@@ -24,6 +24,24 @@ type Status struct {
 	Map        string
 	Players    int
 	MaxClients int
+	// Names holds each connected client's color-stripped name, in the order
+	// the server listed them.
+	Names []string
+}
+
+// PlayersExcluding returns the client count without one client named name.
+// Only a single match is dropped, so a player who copies the name cannot hide
+// a second client.
+func (s Status) PlayersExcluding(name string) int {
+	if name == "" {
+		return s.Players
+	}
+	for _, n := range s.Names {
+		if n == name {
+			return s.Players - 1
+		}
+	}
+	return s.Players
 }
 
 // OOBPacket builds \xFF\xFF\xFF\xFF<payload>\n.
@@ -86,13 +104,25 @@ func ParseStatus(resp []byte) (Status, error) {
 	}
 	s.MaxClients, _ = strconv.Atoi(info["sv_maxclients"])
 
-	// Each remaining non-empty line is one connected client.
+	// Each remaining non-empty line is one connected client: score ping "name".
 	for _, line := range lines[2:] {
 		if strings.TrimSpace(line) != "" {
 			s.Players++
+			s.Names = append(s.Names, playerName(line))
 		}
 	}
 	return s, nil
+}
+
+// playerName extracts the quoted name from a status player line. The name
+// itself may contain quotes, so it runs from the first quote to the last.
+func playerName(line string) string {
+	first := strings.IndexByte(line, '"')
+	last := strings.LastIndexByte(line, '"')
+	if first < 0 || last <= first {
+		return ""
+	}
+	return StripColors(line[first+1 : last])
 }
 
 func ParseInfoString(s string) map[string]string {
