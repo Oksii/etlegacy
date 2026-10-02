@@ -109,6 +109,28 @@ func (p *slaveProc) Signal(sig syscall.Signal) error {
 
 func (p *slaveProc) Done() <-chan struct{} { return p.done }
 
+// slaveNice is how much nicer than the supervisor the ETLTV slave runs, so the
+// server always gets its core first. The slave mostly busy-polls (etlded runs
+// a TV server at a fixed 125 Hz and spins out the last millisecond of each
+// frame), which costs ~12% of a core and can wait.
+const slaveNice = 10
+
+// lowerPriority makes pid delta steps nicer than the process ref (the server).
+// Relative, because the container, or a host daemon such as ananicy, may
+// already have moved the server off nice 0.
+func lowerPriority(pid, ref, delta int) error {
+	// The raw getpriority syscall returns 20-nice to stay positive.
+	prio, err := syscall.Getpriority(syscall.PRIO_PROCESS, ref)
+	if err != nil {
+		return err
+	}
+	nice := 20 - prio + delta
+	if nice > 19 {
+		nice = 19
+	}
+	return syscall.Setpriority(syscall.PRIO_PROCESS, pid, nice)
+}
+
 func etltvConfig(conf map[string]string) etltv.Config {
 	idle, _ := strconv.Atoi(conf["ETLTV_IDLE_DETACH"])
 	return etltv.Config{
@@ -164,7 +186,7 @@ func supervise(args []string, conf map[string]string) {
 		os.Exit(1)
 	}
 
-	tv, stopTV := startETLTV(kids, conf)
+	tv, stopTV := startETLTV(kids, conf, masterPid)
 
 	for {
 		select {
@@ -189,7 +211,7 @@ func supervise(args []string, conf map[string]string) {
 
 // startETLTV starts the recorder, its control socket and the uploader. The
 // returned stop function shuts all of them down.
-func startETLTV(kids *children, conf map[string]string) (*etltv.Manager, func(reason string)) {
+func startETLTV(kids *children, conf map[string]string, masterPid int) (*etltv.Manager, func(reason string)) {
 	cfg := etltvConfig(conf)
 	logf := func(format string, args ...any) {
 		fmt.Printf("[etltv] "+format+"\n", args...)
@@ -212,6 +234,9 @@ func startETLTV(kids *children, conf map[string]string) (*etltv.Manager, func(re
 		pid, exit, err := kids.start(argv, attr)
 		if err != nil {
 			return nil, err
+		}
+		if err := lowerPriority(pid, masterPid, slaveNice); err != nil {
+			fmt.Printf("WARNING: Could not lower the ETLTV slave's priority: %v\n", err)
 		}
 		p := &slaveProc{pid: pid, done: make(chan struct{})}
 		go func() {

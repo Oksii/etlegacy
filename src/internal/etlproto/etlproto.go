@@ -31,8 +31,9 @@ type Status struct {
 
 // PlayersExcluding returns the client count without one client named name.
 // Only a single match is dropped, so a player who copies the name cannot hide
-// a second client.
+// a second client. Names compare without color codes, as Names holds them.
 func (s Status) PlayersExcluding(name string) int {
+	name = StripColors(name)
 	if name == "" {
 		return s.Players
 	}

@@ -258,6 +258,9 @@ so the server browser shows no lock.
 ### Notes
 - The slave takes one of the top ``SVETLTVMAXSLAVES`` client slots. If players fill those slots, it waits for one to free up.
 - The slave joins with ``PASSWORD``. If `g_password` is changed at runtime, the slave can't join.
+- An attached slave uses about 12% of a CPU core, whether or not anyone is playing: etlded runs a TV server at a fixed
+  125 Hz and busy-polls the end of each frame. It runs 10 nice levels below the server, so the server always gets the
+  core first, and it only runs while recording is armed and someone is on the server.
 - ``SVETLTVPASSWORD`` defaults to the publicly known ``3tltv``. Anyone who knows it can attach their own ETLTV slave and
   spectate with full information, so set your own on competitive servers.
 - To own the slave, the container's entrypoint stays PID 1 and runs `etlded` as its child. Exit codes, `rcon quit`

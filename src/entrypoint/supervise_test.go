@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -116,5 +118,48 @@ func TestDefaultETLTVPort(t *testing.T) {
 		if got := defaultETLTVPort(in); got != want {
 			t.Errorf("defaultETLTVPort(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// niceOf reads a process's nice value (field 19 of /proc/<pid>/stat).
+func niceOf(t *testing.T, pid string) int {
+	t.Helper()
+	data, err := os.ReadFile("/proc/" + pid + "/stat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// comm (field 2) may contain spaces; fields after it start past ") ".
+	s := string(data)
+	fields := strings.Fields(s[strings.LastIndexByte(s, ')')+2:])
+	n, err := strconv.Atoi(fields[16]) // field 19 overall
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestLowerPriority(t *testing.T) {
+	kids := testKids()
+	pid, ch, err := kids.start([]string{"/bin/sleep", "30"}, &os.ProcAttr{Files: []*os.File{nil, nil, nil}})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer func() {
+		syscall.Kill(pid, syscall.SIGKILL)
+		waitExit(t, ch)
+	}()
+
+	// Relative to a reference process, here ourselves standing in for the
+	// server.
+	ref := niceOf(t, "self")
+	if err := lowerPriority(pid, os.Getpid(), 10); err != nil {
+		t.Fatalf("lowerPriority: %v", err)
+	}
+	want := ref + 10
+	if want > 19 {
+		want = 19
+	}
+	if got := niceOf(t, strconv.Itoa(pid)); got != want {
+		t.Errorf("child nice = %d, want %d (reference at %d)", got, want, ref)
 	}
 }

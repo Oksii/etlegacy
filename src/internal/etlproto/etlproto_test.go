@@ -280,6 +280,7 @@ func TestPlayersExcluding(t *testing.T) {
 		// A player renaming themselves must not hide a second client.
 		{"duplicate name drops one", []string{"ETLTV", "ETLTV"}, "ETLTV", 1},
 		{"empty exclude", []string{"a"}, "", 1},
+		{"colored name", []string{"a", "gibhub.gg [ETLTV]"}, "^)gib^7hub^).^7gg ^9[ETLTV]", 1},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
