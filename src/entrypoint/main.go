@@ -162,13 +162,8 @@ func loadConf() map[string]string {
 		"ETLTV_UPLOAD_TOKEN":            getenv("ETLTV_UPLOAD_TOKEN", ""),
 	}
 
-	// The slave listens next to the server unless told otherwise.
 	if conf["ETLTV_PORT"] == "" {
-		port, err := strconv.Atoi(conf["MAP_PORT"])
-		if err != nil {
-			port = 27960
-		}
-		conf["ETLTV_PORT"] = strconv.Itoa(port + 1)
+		conf["ETLTV_PORT"] = defaultETLTVPort(conf["MAP_PORT"])
 	}
 
 	if conf["STATS_SUBMIT"] == "true" && conf["SETTINGSBRANCH"] == "main" {
@@ -207,6 +202,17 @@ func loadConf() map[string]string {
 	}
 
 	return conf
+}
+
+// defaultETLTVPort is MAP_PORT+10. Hosts usually number their servers
+// 27960, 27961, ..., so +1 would collide with the next server's port once the
+// relay is published, while +10 leaves room for ten servers.
+func defaultETLTVPort(mapPort string) string {
+	port, err := strconv.Atoi(mapPort)
+	if err != nil {
+		port = 27960
+	}
+	return strconv.Itoa(port + 10)
 }
 
 func updateConfigs(conf map[string]string) (bool, error) {

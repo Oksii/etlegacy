@@ -224,7 +224,7 @@ ETLTV_UPLOAD_URL      | Upload each finished demo to this URL (see below) | ``No
 ETLTV_UPLOAD_TOKEN    | Bearer token sent with uploads | ``None``
 ETLTV_NAME            | Name the slave uses on the server | ``ETLTV``
 ETLTV_PUBLIC          | Let clients connect to the slave to spectate (see below) | ``false``
-ETLTV_PORT            | Port of the slave | ``MAP_PORT`` + 1
+ETLTV_PORT            | Port of the slave. The default leaves room for up to ten servers numbered from 27960 | ``MAP_PORT`` + 10
 ETLTV_MAXCLIENTS      | Spectator slots on the slave | ``10``
 ETLTV_VIEWERPASSWORD  | Password spectators need to join the slave | ``None``
 ETLTV_DELAY           | Delay the slave's feed by this many seconds (``sv_etltv_delay``). This delays the recording too | ``0``
@@ -251,7 +251,7 @@ Uploads never hold up a restart: one cut off by a restart is retried after the n
 
 ### Spectator relay
 With ``ETLTV_PUBLIC=true``, clients can connect to the slave on ``ETLTV_PORT`` to spectate. Publish that port, e.g.
-``'27961:27961/udp'``. Spectators see both teams, the same as a shoutcaster. On competitive servers, use
+``'27970:27970/udp'`` for a server on 27960. Spectators see both teams, the same as a shoutcaster. On competitive servers, use
 ``ETLTV_DELAY`` and/or ``ETLTV_VIEWERPASSWORD``. The slave enforces the viewer password but does not advertise it,
 so the server browser shows no lock.
 

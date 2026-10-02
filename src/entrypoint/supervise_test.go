@@ -104,3 +104,17 @@ func TestSlaveProcRefusesNonPositivePid(t *testing.T) {
 		t.Fatal("signalled pid -1")
 	}
 }
+
+func TestDefaultETLTVPort(t *testing.T) {
+	tests := map[string]string{
+		"27960": "27970",
+		"27963": "27973",
+		"":      "27970", // MAP_PORT unset or unparsable: the engine default
+		"abc":   "27970",
+	}
+	for in, want := range tests {
+		if got := defaultETLTVPort(in); got != want {
+			t.Errorf("defaultETLTVPort(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
