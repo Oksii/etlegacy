@@ -3,6 +3,7 @@ package etltv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -81,7 +82,15 @@ func retryDelay(failures int) time.Duration {
 
 func (u *Uploader) drain(ctx context.Context) error {
 	for _, path := range pendingDemos(u.dir) {
-		if err := u.upload(ctx, path); err != nil {
+		err := u.upload(ctx, path)
+		var rej rejectedError
+		if errors.As(err, &rej) {
+			// Retrying would get the same answer and hold up every demo after it.
+			os.WriteFile(path+".rejected", []byte(rej.Error()+"\n"), 0644)
+			u.logf("%s rejected, not retrying: %v", filepath.Base(path), rej)
+			continue
+		}
+		if err != nil {
 			return fmt.Errorf("%s: %w", filepath.Base(path), err)
 		}
 		marker := fmt.Sprintf("uploaded %s to %s\n", time.Now().UTC().Format(time.RFC3339), u.url)
@@ -105,7 +114,7 @@ func pendingDemos(dir string) []string {
 			continue
 		}
 		path := filepath.Join(dir, name)
-		if fileExists(path + ".uploaded") {
+		if fileExists(path+".uploaded") || fileExists(path+".rejected") {
 			continue
 		}
 		out = append(out, path)
@@ -143,10 +152,26 @@ func (u *Uploader) upload(ctx context.Context, path string) error {
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(body)))
+	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+		return nil
 	}
-	return nil
+	err = fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(body)))
+	if refusesDemo(resp.StatusCode) {
+		return rejectedError{err}
+	}
+	return err
+}
+
+type rejectedError struct{ error }
+
+// Refusals of the demo itself. Anything else (auth, wrong URL, outages) is retried.
+func refusesDemo(status int) bool {
+	switch status {
+	case http.StatusBadRequest, http.StatusRequestEntityTooLarge,
+		http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity:
+		return true
+	}
+	return false
 }
 
 func writeForm(mw *multipart.Writer, meta demoMeta, path string) error {

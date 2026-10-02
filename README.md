@@ -246,7 +246,8 @@ The upload is a `multipart/form-data` POST:
 - `interrupted` (left over from an unclean exit)
 
 Any 2xx response marks the demo as uploaded, and `<demo>.uploaded` is written beside it. The local copy is kept.
-Failed uploads are retried with a back-off.
+Failed uploads are retried with a back-off. A demo refused with 400, 413, 415 or 422 is not retried: `<demo>.rejected` is
+written beside it with the response, and the uploads after it go ahead.
 Uploads never hold up a restart: one cut off by a restart is retried after the next boot.
 
 ### ETLTV relay

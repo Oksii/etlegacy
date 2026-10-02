@@ -119,3 +119,31 @@ func TestUploadFailureKeepsDemoPending(t *testing.T) {
 		t.Errorf("pending = %v, want the demo still pending", p)
 	}
 }
+
+func TestUploadRejectedDemoDoesNotBlockLaterOnes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseMultipartForm(1 << 20)
+		if r.FormValue("map") == "bad" {
+			http.Error(w, "Not an ETLTV demo", http.StatusUnprocessableEntity)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	bad := writeDemo(t, dir, "a_bad.tv_84", demoMeta{Map: "bad"})
+	good := writeDemo(t, dir, "b_good.tv_84", demoMeta{Map: "good"})
+
+	u := NewUploader(Config{UploadURL: srv.URL, DemoDir: dir}, t.Logf)
+	if err := u.drain(context.Background()); err != nil {
+		t.Fatalf("drain: %v", err)
+	}
+	if !fileExists(bad+".rejected") || fileExists(bad+".uploaded") {
+		t.Error("rejected demo not marked .rejected")
+	}
+	if !fileExists(good + ".uploaded") {
+		t.Error("demo after a rejected one was not uploaded")
+	}
+	if p := pendingDemos(dir); len(p) != 0 {
+		t.Errorf("pending = %v, want none", p)
+	}
+}
