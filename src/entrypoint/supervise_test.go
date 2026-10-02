@@ -1,0 +1,135 @@
+package main
+
+import (
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"testing"
+	"time"
+)
+
+// One reaper per process, as in the supervisor: a second would steal statuses.
+var (
+	sharedKids     *children
+	sharedKidsOnce sync.Once
+)
+
+func testKids() *children {
+	sharedKidsOnce.Do(func() { sharedKids = newChildren() })
+	return sharedKids
+}
+
+func waitExit(t *testing.T, ch <-chan syscall.WaitStatus) syscall.WaitStatus {
+	t.Helper()
+	select {
+	case ws := <-ch:
+		return ws
+	case <-time.After(5 * time.Second):
+		t.Fatal("exit status never delivered")
+		return 0
+	}
+}
+
+func TestChildrenDeliversExitStatus(t *testing.T) {
+	kids := testKids()
+	attr := &os.ProcAttr{Files: []*os.File{nil, os.Stdout, os.Stderr}}
+
+	tests := []struct {
+		script string
+		want   int
+	}{
+		{"exit 0", 0},
+		{"exit 3", 3},
+		{"kill -TERM $$", 128 + int(syscall.SIGTERM)},
+	}
+	for _, tc := range tests {
+		_, ch, err := kids.start([]string{"/bin/sh", "-c", tc.script}, attr)
+		if err != nil {
+			t.Fatalf("start %q: %v", tc.script, err)
+		}
+		if got := exitCode(waitExit(t, ch)); got != tc.want {
+			t.Errorf("%q: exit code %d, want %d", tc.script, got, tc.want)
+		}
+	}
+}
+
+// Children exiting before start returns must still get their status.
+func TestChildrenImmediateExit(t *testing.T) {
+	kids := testKids()
+	attr := &os.ProcAttr{Files: []*os.File{nil, nil, nil}}
+
+	var chans []<-chan syscall.WaitStatus
+	for i := 0; i < 50; i++ {
+		_, ch, err := kids.start([]string{"/bin/true"}, attr)
+		if err != nil {
+			t.Fatalf("start: %v", err)
+		}
+		chans = append(chans, ch)
+	}
+	for _, ch := range chans {
+		if got := exitCode(waitExit(t, ch)); got != 0 {
+			t.Errorf("exit code %d, want 0", got)
+		}
+	}
+}
+
+// Release() sets p.Pid to -1; kill(-1) would hit every process.
+func TestChildrenReturnsRealPid(t *testing.T) {
+	kids := testKids()
+	pid, ch, err := kids.start([]string{"/bin/sleep", "30"}, &os.ProcAttr{Files: []*os.File{nil, nil, nil}})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if pid <= 0 {
+		t.Fatalf("pid = %d", pid)
+	}
+	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+		t.Fatalf("kill %d: %v", pid, err)
+	}
+	ws := waitExit(t, ch)
+	if !ws.Signaled() || ws.Signal() != syscall.SIGTERM {
+		t.Errorf("child not ended by our SIGTERM: %v", ws)
+	}
+}
+
+func niceOf(t *testing.T, pid string) int {
+	t.Helper()
+	data, err := os.ReadFile("/proc/" + pid + "/stat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// comm (field 2) may contain spaces; fields after it start past ") ".
+	s := string(data)
+	fields := strings.Fields(s[strings.LastIndexByte(s, ')')+2:])
+	n, err := strconv.Atoi(fields[16]) // field 19 overall
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestLowerPriority(t *testing.T) {
+	kids := testKids()
+	pid, ch, err := kids.start([]string{"/bin/sleep", "30"}, &os.ProcAttr{Files: []*os.File{nil, nil, nil}})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer func() {
+		syscall.Kill(pid, syscall.SIGKILL)
+		waitExit(t, ch)
+	}()
+
+	ref := niceOf(t, "self")
+	if err := lowerPriority(pid, os.Getpid(), 10); err != nil {
+		t.Fatalf("lowerPriority: %v", err)
+	}
+	want := ref + 10
+	if want > 19 {
+		want = 19
+	}
+	if got := niceOf(t, strconv.Itoa(pid)); got != want {
+		t.Errorf("child nice = %d, want %d (reference at %d)", got, want, ref)
+	}
+}

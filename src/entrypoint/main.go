@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 	"unicode"
 )
@@ -149,6 +149,21 @@ func loadConf() map[string]string {
 		"OMNIBOT":                       getenv("OMNIBOT", "0"),
 		"MAPS_AUTO":                     getenv("MAPS_AUTO", "true"),
 		"MAPS_FORCE_COPY":               getenv("MAPS_FORCE_COPY", "false"),
+		"ETLTV_AUTOSTART":               getenv("ETLTV_AUTOSTART", "false"),
+		"ETLTV_PUBLIC":                  getenv("ETLTV_PUBLIC", "false"),
+		"ETLTV_PORT":                    getenv("ETLTV_PORT", ""),
+		"ETLTV_NAME":                    getenv("ETLTV_NAME", "ETLTV"),
+		"ETLTV_MAXCLIENTS":              getenv("ETLTV_MAXCLIENTS", "10"),
+		"ETLTV_VIEWERPASSWORD":          getenv("ETLTV_VIEWERPASSWORD", ""),
+		"ETLTV_DELAY":                   getenv("ETLTV_DELAY", "0"),
+		"ETLTV_IDLE_DETACH":             getenv("ETLTV_IDLE_DETACH", "120"),
+		"ETLTV_DEMO_DIR":                getenv("ETLTV_DEMO_DIR", homepath+"/tvdemos"),
+		"ETLTV_UPLOAD_URL":              getenv("ETLTV_UPLOAD_URL", ""),
+		"ETLTV_UPLOAD_TOKEN":            getenv("ETLTV_UPLOAD_TOKEN", ""),
+	}
+
+	if conf["ETLTV_PORT"] == "" {
+		conf["ETLTV_PORT"] = defaultETLTVPort(conf["MAP_PORT"])
 	}
 
 	if conf["STATS_SUBMIT"] == "true" && conf["SETTINGSBRANCH"] == "main" {
@@ -187,6 +202,15 @@ func loadConf() map[string]string {
 	}
 
 	return conf
+}
+
+// MAP_PORT+10 stays clear of servers numbered 27960, 27961, ... on one host.
+func defaultETLTVPort(mapPort string) string {
+	port, err := strconv.Atoi(mapPort)
+	if err != nil {
+		port = 27960
+	}
+	return strconv.Itoa(port + 10)
 }
 
 func updateConfigs(conf map[string]string) (bool, error) {
@@ -970,21 +994,5 @@ func main() {
 	args = append(args, parseCLIArgs()...)
 	args = append(args, os.Args[1:]...)
 
-	if getenv("AUTORESTART", "true") == "true" {
-		if interval := getenv("AUTORESTART_INTERVAL", "120"); interval != "0" {
-			cmd := exec.Command(gameBase+"/autorestart", interval)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Start(); err != nil {
-				fmt.Printf("WARNING: Failed to start autorestart daemon: %v\n", err)
-			} else {
-				fmt.Printf("Autorestart daemon started (PID %d)\n", cmd.Process.Pid)
-			}
-		}
-	}
-
-	if err := syscall.Exec(etlded, args, os.Environ()); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to exec %s: %v\n", etlded, err)
-		os.Exit(1)
-	}
+	supervise(args, conf)
 }
