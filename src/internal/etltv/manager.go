@@ -233,7 +233,7 @@ func (m *Manager) handleLine(run *slaveRun, line string) {
 		return
 	}
 
-	var finish *recording
+	var finish, begun *recording
 	var reason string
 
 	m.mu.Lock()
@@ -250,6 +250,7 @@ func (m *Manager) handleLine(run *slaveRun, line string) {
 	case evRecording:
 		finish, reason = run.takeStopped(), reasonMapChange // normally done by evInit already
 		run.rec = &recording{raw: ev.value, tag: m.state.Tag, mapName: run.mapName, started: m.now()}
+		begun = run.rec
 		run.recorded = true
 		m.failures = 0
 	case evStopped:
@@ -268,6 +269,13 @@ func (m *Manager) handleLine(run *slaveRun, line string) {
 
 	if finish != nil {
 		m.finalize(finish, reason)
+	}
+	// After the finalize above, which clears the previous demo's entry.
+	if begun != nil {
+		live := liveRecording{Raw: filepath.Base(begun.raw), Tag: begun.tag, Map: begun.mapName, Started: begun.started}
+		if err := saveRecording(m.cfg.recordingPath(), live); err != nil {
+			m.logf("save %s: %v", m.cfg.recordingPath(), err)
+		}
 	}
 }
 
@@ -417,19 +425,29 @@ func (m *Manager) finalizeFile(src string, rec *recording, reason string) {
 		os.Remove(dst + ".json")
 		return
 	}
+	// Only if it is still this demo's: a new slave may already have started the next.
+	if live := loadRecording(m.cfg.recordingPath()); live != nil && live.Started.Equal(rec.started) {
+		os.Remove(m.cfg.recordingPath())
+	}
 	m.logf("saved %s (%s)", meta.Filename, reason)
 	m.finished()
 }
 
 // sweepLeftovers finalizes demos left by an unclean exit (OOM kill, crash).
 func (m *Manager) sweepLeftovers() {
+	live := loadRecording(m.cfg.recordingPath())
 	matches, _ := filepath.Glob(filepath.Join(m.cfg.homePath(), "*", "tvdemos", "*"))
 	for _, p := range matches {
 		info, err := os.Stat(p)
 		if err != nil || info.IsDir() {
 			continue
 		}
-		m.finalizeFile(p, &recording{started: info.ModTime()}, reasonInterrupted)
+		rec := &recording{started: info.ModTime()}
+		if live != nil && live.Raw == filepath.Base(p) {
+			rec = &recording{tag: live.Tag, mapName: live.Map, started: live.Started}
+			live = nil
+		}
+		m.finalizeFile(p, rec, reasonInterrupted)
 	}
 }
 
