@@ -235,6 +235,8 @@ func startETLTV(kids *children, conf map[string]string, masterPid int) func(reas
 	if uploader != nil {
 		finished = uploader.Notify
 		go uploader.Run(ctx)
+	} else {
+		logf("uploads off, ETLTV_UPLOAD_URL is not set; demos stay in %s", cfg.DemoDir)
 	}
 
 	tv := etltv.NewManager(cfg, start, status, logf, finished)

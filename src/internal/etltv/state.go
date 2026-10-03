@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type State struct {
@@ -45,6 +46,34 @@ func resolveState(file State, exists, autostart bool) (State, string) {
 		return file, sourceStateFile
 	}
 	return State{Armed: autostart}, sourceEnv
+}
+
+// The demo being written, so one left by an unclean exit keeps its tag and map.
+type liveRecording struct {
+	Raw     string    `json:"raw"` // demo0000.tv_84
+	Tag     string    `json:"tag,omitempty"`
+	Map     string    `json:"map,omitempty"`
+	Started time.Time `json:"started"`
+}
+
+func loadRecording(path string) *liveRecording {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var r liveRecording
+	if json.Unmarshal(data, &r) != nil {
+		return nil
+	}
+	return &r
+}
+
+func saveRecording(path string, r liveRecording) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(path, data)
 }
 
 func writeFileAtomic(path string, data []byte) error {

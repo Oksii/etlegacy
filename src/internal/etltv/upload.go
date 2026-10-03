@@ -81,25 +81,33 @@ func retryDelay(failures int) time.Duration {
 }
 
 func (u *Uploader) drain(ctx context.Context) error {
+	var first error
 	for _, path := range pendingDemos(u.dir) {
 		err := u.upload(ctx, path)
 		var rej rejectedError
 		if errors.As(err, &rej) {
-			// Retrying would get the same answer and hold up every demo after it.
+			// Retrying would get the same answer.
 			os.WriteFile(path+".rejected", []byte(rej.Error()+"\n"), 0644)
 			u.logf("%s rejected, not retrying: %v", filepath.Base(path), rej)
 			continue
 		}
-		if err != nil {
-			return fmt.Errorf("%s: %w", filepath.Base(path), err)
+		if err == nil {
+			marker := fmt.Sprintf("uploaded %s to %s\n", time.Now().UTC().Format(time.RFC3339), u.url)
+			if err = os.WriteFile(path+".uploaded", []byte(marker), 0644); err == nil {
+				u.logf("uploaded %s", filepath.Base(path))
+				continue
+			}
+			err = fmt.Errorf("write marker: %w", err)
 		}
-		marker := fmt.Sprintf("uploaded %s to %s\n", time.Now().UTC().Format(time.RFC3339), u.url)
-		if err := os.WriteFile(path+".uploaded", []byte(marker), 0644); err != nil {
-			return fmt.Errorf("%s: write marker: %w", filepath.Base(path), err)
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
-		u.logf("uploaded %s", filepath.Base(path))
+		// Carry on: one demo that keeps failing must not hold up the rest.
+		if first == nil {
+			first = fmt.Errorf("%s: %w", filepath.Base(path), err)
+		}
 	}
-	return nil
+	return first
 }
 
 func pendingDemos(dir string) []string {

@@ -229,6 +229,10 @@ func TestRecordsOneDemoPerMapAndStops(t *testing.T) {
 	if meta.EndReason != reasonMapChange || meta.Map != "supply" || meta.Tag != "cup" {
 		t.Errorf("supply metadata = %+v", meta)
 	}
+	eventually(t, "radar in recording.json", func() bool {
+		live := loadRecording(h.cfg.recordingPath())
+		return live != nil && live.Map == "radar" && live.Tag == "cup"
+	})
 
 	if resp := h.m.Handle(Request{Cmd: "stop"}); !resp.OK {
 		t.Fatalf("stop: %s", resp.Message)
@@ -241,6 +245,7 @@ func TestRecordsOneDemoPerMapAndStops(t *testing.T) {
 	if meta.EndReason != reasonStop {
 		t.Errorf("radar end_reason = %q, want %q", meta.EndReason, reasonStop)
 	}
+	eventually(t, "recording.json removed", func() bool { return !fileExists(h.cfg.recordingPath()) })
 	eventually(t, "detach", func() bool { return !h.m.Status().Attached })
 	if !h.m.retryAt.IsZero() {
 		t.Errorf("a requested stop must not schedule a retry")
@@ -389,6 +394,22 @@ func TestSweepsLeftoversAtBoot(t *testing.T) {
 	}
 	if meta := readMeta(matches[0]); meta.EndReason != reasonInterrupted {
 		t.Errorf("end_reason = %q, want %q", meta.EndReason, reasonInterrupted)
+	}
+}
+
+func TestSweptLeftoverKeepsTagAndMap(t *testing.T) {
+	h := newHarness(t, false)
+	started := time.Date(2026, 10, 3, 15, 33, 0, 0, time.UTC)
+	saveRecording(h.cfg.recordingPath(), liveRecording{Raw: "demo0000.tv_84", Tag: "90370", Map: "te_escape2", Started: started})
+	h.writeRaw("demo0000.tv_84")
+	h.m.sweepLeftovers()
+
+	meta := h.finished("90370_2026-10-03_153300_te_escape2.tv_84")
+	if meta.Tag != "90370" || meta.Map != "te_escape2" || meta.EndReason != reasonInterrupted {
+		t.Errorf("metadata = %+v", meta)
+	}
+	if fileExists(h.cfg.recordingPath()) {
+		t.Error("recording.json left behind")
 	}
 }
 

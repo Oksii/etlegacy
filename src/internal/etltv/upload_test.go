@@ -147,3 +147,28 @@ func TestUploadRejectedDemoDoesNotBlockLaterOnes(t *testing.T) {
 		t.Errorf("pending = %v, want none", p)
 	}
 }
+
+func TestUploadFailingDemoDoesNotBlockLaterOnes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseMultipartForm(1 << 20)
+		if r.FormValue("map") == "stuck" {
+			http.Error(w, "discord down", http.StatusBadGateway)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	stuck := writeDemo(t, dir, "a_stuck.tv_84", demoMeta{Map: "stuck"})
+	good := writeDemo(t, dir, "b_good.tv_84", demoMeta{Map: "good"})
+
+	u := NewUploader(Config{UploadURL: srv.URL, DemoDir: dir}, t.Logf)
+	if err := u.drain(context.Background()); err == nil {
+		t.Fatal("expected an error for the 502")
+	}
+	if fileExists(stuck+".uploaded") || fileExists(stuck+".rejected") {
+		t.Error("failed demo should stay pending")
+	}
+	if !fileExists(good + ".uploaded") {
+		t.Error("demo after a failing one was not uploaded")
+	}
+}

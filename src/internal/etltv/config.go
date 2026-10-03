@@ -36,5 +36,7 @@ type Config struct {
 
 func (c Config) statePath() string { return filepath.Join(c.StateDir, "state") }
 
+func (c Config) recordingPath() string { return filepath.Join(c.StateDir, "recording.json") }
+
 // Separate from the server's, so the two never write the same etconfig.cfg.
 func (c Config) homePath() string { return filepath.Join(c.StateDir, "home") }

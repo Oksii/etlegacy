@@ -243,11 +243,11 @@ The upload is a `multipart/form-data` POST:
 - `quit` (the server quit, e.g. `rcon quit`)
 - `shutdown` (the container was stopped)
 - `disconnect` (the server dropped the slave)
-- `interrupted` (left over from an unclean exit)
+- `interrupted` (left over from an unclean exit; it keeps its tag and map)
 
 Any 2xx response marks the demo as uploaded, and `<demo>.uploaded` is written beside it. The local copy is kept.
-Failed uploads are retried with a back-off. A demo refused with 400, 413, 415 or 422 is not retried: `<demo>.rejected` is
-written beside it with the response, and the uploads after it go ahead.
+Failed uploads are retried with a back-off, and one that keeps failing does not hold up the demos after it.
+A demo refused with 400, 413, 415 or 422 is not retried: `<demo>.rejected` is written beside it with the response.
 Uploads never hold up a restart: one cut off by a restart is retried after the next boot.
 
 ### ETLTV relay
