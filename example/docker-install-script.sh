@@ -325,13 +325,14 @@ EOL
     echo "# Volumes" >> "$temp_file"
     grep "^MAPSDIR=" "$SETTINGS_FILE" >> "$temp_file" || true
     grep "^LOGS=" "$SETTINGS_FILE" >> "$temp_file" || true
+    grep "^DEMOS=" "$SETTINGS_FILE" >> "$temp_file" || true
     
     echo -e "\n# Map Settings" >> "$temp_file"
     grep "^MAPS=" "$SETTINGS_FILE" >> "$temp_file" || true
     
     echo -e "\n# Additional Settings" >> "$temp_file"
     # Find all global settings that don't belong to other categories
-    grep -v "^SERVER[0-9]\+_\|^VERSION=\|^MAPSDIR=\|^LOGS=\|^MAPS=\|^STATS_" "$SETTINGS_FILE" | \
+    grep -v "^SERVER[0-9]\+_\|^VERSION=\|^MAPSDIR=\|^LOGS=\|^DEMOS=\|^MAPS=\|^STATS_\|^ETLTV_" "$SETTINGS_FILE" | \
     while read -r line; do
         if [[ -n "$line" && ! "$line" =~ ^#.* ]]; then
             echo "$line" >> "$temp_file"
@@ -340,6 +341,9 @@ EOL
     
     echo -e "\n# Stats Configuration" >> "$temp_file"
     grep "^STATS_" "$SETTINGS_FILE" >> "$temp_file" || true
+
+    echo -e "\n# ETLTV" >> "$temp_file"
+    grep "^ETLTV_" "$SETTINGS_FILE" >> "$temp_file" || true
 
     # Group server settings by instance
     while read -r instance; do
@@ -1616,6 +1620,45 @@ setup_stats_variables() {
     sleep 2
 }
 
+setup_etltv() {
+    show_header
+    print_section_header "ETLTV Configuration" "(These settings can be changed later)"
+    log "prompt" "Each server can record ETLTV demos through a relay, which spectators can also join."
+    log "prompt" "Recording is off until you run 'etl-server etltv start'. Demos are saved to $INSTALL_DIR/demos"
+    echo
+    echo
+    read -r -p "Let players spectate through the ETLTV relay? [default: no] (y/N): " ENABLE_PUBLIC
+    if [[ $ENABLE_PUBLIC =~ ^[Yy]$ ]]; then
+        ETLTV_PUBLIC="true"
+        local slots
+        while true; do
+            read -r -p "Spectator slots on the relay [default: 10]: " slots
+            slots=${slots:-10}
+            if [[ "$slots" =~ ^[0-9]+$ ]] && [ "$slots" -ge 1 ] && [ "$slots" -le 64 ]; then
+                break
+            fi
+            log "error" "Please enter a number between 1 and 64"
+        done
+        store_setting "ETLTV" "ETLTV_MAXCLIENTS" "$slots"
+    else
+        ETLTV_PUBLIC="false"
+    fi
+    store_setting "ETLTV" "ETLTV_PUBLIC" "$ETLTV_PUBLIC"
+
+    echo
+    read -r -p "Post ETLTV demos to gibhub? [default: yes] (Y/n): " UPLOAD_DEMOS
+    if [[ ! $UPLOAD_DEMOS =~ ^[Nn]$ ]]; then
+        store_setting "ETLTV" "ETLTV_NAME" "^)gib^7hub^).^7gg ^9[ETLTV]"
+        store_setting "ETLTV" "ETLTV_UPLOAD_URL" "https://api.etl.lol/api/v2/stats/etl/matches/stats/demo"
+        store_setting "ETLTV" "ETLTV_UPLOAD_TOKEN" "GameStatsWebLuaToken"
+    else
+        sed -i '/^ETLTV_\(NAME\|UPLOAD_URL\|UPLOAD_TOKEN\)=/d' "$SETTINGS_FILE"  # left over from an earlier run
+    fi
+
+    log "success" "ETLTV configured!"
+    sleep 2
+}
+
 configure_watchtower() {
     show_header
     print_section_header "Watchtower Configuration" "(Can be removed later)"
@@ -1692,13 +1735,20 @@ generate_service() {
     print_section_header "Server $instance Configuration"
     log "prompt" "Required:"
     # Get required settings from user
-    local port
+    local port taken
+    local max_port=65535
+    [ "$ETLTV_PUBLIC" = "true" ] && max_port=65525  # leaves room for the relay on port + 10
     while true; do
         read -p "Server Port           [default: $default_port]: " port
         port=${port:-$default_port}
         
-        if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1024 ] || [ "$port" -gt 65535 ]; then
-            log "error" "Invalid port number. Must be between 1024 and 65535"
+        if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1024 ] || [ "$port" -gt "$max_port" ]; then
+            log "error" "Invalid port number. Must be between 1024 and $max_port"
+            continue
+        fi
+        taken=$(used_ports "$instance")
+        if grep -qx "$port" <<< "$taken" || { [ "$ETLTV_PUBLIC" = "true" ] && grep -qx "$((port + 10))" <<< "$taken"; }; then
+            log "error" "Port $port or its ETLTV relay port $((port + 10)) is already used by another server"
             continue
         fi
         break
@@ -1727,6 +1777,12 @@ generate_service() {
     [ -n "$referee" ] && store_server_setting "$instance" "REFPASSWORD" "$referee"
     [ -n "$sc" ] && store_server_setting "$instance" "SCPASSWORD" "$sc"
 
+    if [ "$ETLTV_PUBLIC" = "true" ]; then
+        store_server_setting "$instance" "ETLTV_PORT" "$((port + 10))"
+    else
+        sed -i "/^SERVER${instance}_ETLTV_PORT=/d" "$SETTINGS_FILE"  # left over from an earlier run
+    fi
+
     # Generate only the basic service structure without environment variables
     cat >> docker-compose.yml << EOL
 
@@ -1737,9 +1793,21 @@ generate_service() {
     volumes:
       - "\${MAPSDIR}/etmain:/maps"
       - "\${LOGS}/etl-server$instance:/legacy/homepath/legacy/"
+      - "\${DEMOS}/etl-server$instance:/legacy/homepath/tvdemos"
     ports:
       - '\${SERVER${instance}_MAP_PORT}:\${SERVER${instance}_MAP_PORT}/udp'
 EOL
+    if [ "$ETLTV_PUBLIC" = "true" ]; then
+        echo "      - '\${SERVER${instance}_ETLTV_PORT}:\${SERVER${instance}_ETLTV_PORT}/udp'" >> docker-compose.yml
+    fi
+}
+
+# Ports the instances configured before this one use, for their server or ETLTV relay.
+used_ports() {
+    local instance="$1" i
+    for ((i = 1; i < instance; i++)); do
+        grep -E "^SERVER${i}_(MAP|ETLTV)_PORT=" "$SETTINGS_FILE" | cut -d'=' -f2
+    done
 }
 
 generate_docker_compose() {
@@ -1808,6 +1876,7 @@ setup_volume_paths() {
     local install_dir="$1"
     store_setting "Volumes" "MAPSDIR" "$install_dir/maps"
     store_setting "Volumes" "LOGS" "$install_dir/logs"
+    store_setting "Volumes" "DEMOS" "$install_dir/demos"
 }
 
 create_helper_script() {
@@ -1837,6 +1906,7 @@ usage() {
     echo "ETLegacy Server Management Script"
     echo "================================"
     echo "Usage: $0 [start|stop|restart|status|logs|rcon] [instance_number] [command]"
+    echo "       $0 etltv [start|stop|status|reset] [instance_number] [tag]"
     echo
     echo "Commands:"
     echo "  start    Start servers"
@@ -1846,6 +1916,7 @@ usage() {
     echo "  logs     Show live logs for a server"
     echo "  rcon     Execute RCON command on a server"
     echo "  update   Updates and restarts the server with the latest available image"
+    echo "  etltv    Start, stop or check ETLTV demo recording"
     echo
     echo "Examples:"
     echo "Management Utilities" 
@@ -1862,6 +1933,12 @@ usage() {
     echo "  etl-server update 2          # Updates server instance 2 if empty"
     echo "  etl-server update --force    # Updates all servers regardless of players"
     echo "  etl-server update 2 --force  # Updates server instance 2 regardless of players"
+    echo "ETLTV - Record demos through the ETLTV relay (saved to $INSTALL_DIR/demos)"
+    echo "  etl-server etltv start             # Starts recording on all servers"
+    echo "  etl-server etltv start 1 match42   # Starts recording on server 1, demos named match42_..."
+    echo "  etl-server etltv stop              # Stops recording on all servers and saves the demos"
+    echo "  etl-server etltv status 2          # Shows whether server 2 is recording"
+    echo "  etl-server etltv reset             # Goes back to the ETLTV_AUTOSTART setting"
     exit 1
 }
 
@@ -2054,6 +2131,32 @@ execute_rcon() {
     docker exec "$container" ./etlutil rcon "$command"
 }
 
+etltv_command() {
+    local cmd="$1" instance="$2" tag="$3"
+
+    case $cmd in
+        start|stop|status|reset) ;;
+        *) usage ;;
+    esac
+    if [ -n "$instance" ] && ! [[ "$instance" =~ ^[0-9]+$ ]]; then
+        echo "Error: instance must be a number, e.g. 'etl-server etltv start 1 $instance'"
+        exit 1
+    fi
+    if [ -n "$tag" ] && [ "$cmd" != "start" ]; then
+        echo "Error: a tag only goes with 'etltv start'"
+        exit 1
+    fi
+
+    if [ -n "$instance" ]; then
+        docker exec "etl-server$instance" ./etlutil tv "$cmd" ${tag:+"$tag"}
+        return
+    fi
+    for container in $(docker ps --filter "name=etl-server" --format "{{.Names}}" | sort); do
+        echo "$container:"
+        docker exec "$container" ./etlutil tv "$cmd"
+    done
+}
+
 if [ $# -lt 1 ]; then
     usage
 fi
@@ -2114,6 +2217,9 @@ case $ACTION in
         ;;
     update)
         update_servers "$INSTANCE"
+        ;;
+    etltv)
+        etltv_command "$2" "$3" "$4"
         ;;
     *)
         usage
@@ -2257,6 +2363,7 @@ main() {
     setup_maps "$INSTALL_DIR"
     setup_map_environment
     setup_stats_variables
+    setup_etltv
     configure_server_instances
     configure_server_settings "$INSTANCES"
     configure_watchtower
@@ -2270,11 +2377,13 @@ main() {
     create_helper_script "$INSTALL_DIR" "$INSTANCES"
 
     setup_directory "$INSTALL_DIR/logs" "$SELECTED_USER" || exit 1
+    setup_directory "$INSTALL_DIR/demos" "$SELECTED_USER" || exit 1
     for i in $(seq 1 $INSTANCES); do
         setup_directory "$INSTALL_DIR/logs/etl-server$i" "$SELECTED_USER" || exit 1
+        setup_directory "$INSTALL_DIR/demos/etl-server$i" "$SELECTED_USER" || exit 1
     done
 
-    chmod -R 777 "$INSTALL_DIR/logs"
+    chmod -R 777 "$INSTALL_DIR/logs" "$INSTALL_DIR/demos"
     chown -R "$SELECTED_USER:$SELECTED_USER" "$INSTALL_DIR"
 
     show_header
@@ -2337,6 +2446,11 @@ main() {
     log "prompt" "Alternatively: follow docker's logs via 'etl-server logs [instance_number]'"
     echo
 
+    print_section_header "ETLTV"
+    log "prompt" "Recording is off until you run 'etl-server etltv start [instance_number]'"
+    log "prompt" "Demos are saved to $INSTALL_DIR/demos"
+    echo
+
     print_section_header "Uninstall/Re-install" 
     log "prompt" "If you wish to re-install or uninstall you can follow the instructions below"
     log "warning" "This will erase all your configuration settings."
@@ -2355,6 +2469,10 @@ main() {
         port=$(grep "SERVER${i}_MAP_PORT=" "$SETTINGS_FILE" | cut -d'=' -f2)
         if [ ! -z "$port" ]; then
             printf "${CYAN}  └─ Port ${port}${NC}\n"
+        fi
+        port=$(grep "^SERVER${i}_ETLTV_PORT=" "$SETTINGS_FILE" | cut -d'=' -f2)
+        if [ -n "$port" ]; then
+            echo -e "${CYAN}  └─ Port ${port} (ETLTV relay)${NC}"
         fi
     done
 
