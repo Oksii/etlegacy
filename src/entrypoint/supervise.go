@@ -133,6 +133,8 @@ func etltvConfig(conf map[string]string) etltv.Config {
 		MaxClients:     conf["ETLTV_MAXCLIENTS"],
 		ViewerPassword: conf["ETLTV_VIEWERPASSWORD"],
 		Delay:          conf["ETLTV_DELAY"],
+		AutoRecord:     conf["ETLTV_AUTORECORD"],
+		AutoAction:     conf["ETLTV_AUTOACTION"],
 		IdleDetach:     time.Duration(idle) * time.Second,
 		UploadURL:      conf["ETLTV_UPLOAD_URL"],
 		UploadToken:    conf["ETLTV_UPLOAD_TOKEN"],

@@ -189,8 +189,8 @@ possible or create a custom `SETTINGSURL`.
 # ETLTV recording
 The server can record matches as ETLTV demos (`.tv_84`). The ET: Legacy client plays these natively with
 `/tv demo <name>` (put the file in `legacy/tvdemos/`; `/tv ff <seconds>` skips ahead).
-A second `etlded` joins the server as an ETLTV slave and records one demo per map.
-Warmup and both stopwatch rounds of a map end up in the same file.
+A second `etlded` joins the server as an ETLTV slave and records one demo per map, from the warmup countdown. Both stopwatch rounds
+of a map, and the warmup between them, end up in the same file. A map that never leaves warmup records nothing.
 
 Recording is armed on demand. It stays armed across restarts, until it is disarmed:
 
@@ -228,6 +228,8 @@ ETLTV_PORT            | Port of the slave. The default leaves room for up to ten
 ETLTV_MAXCLIENTS      | Spectator slots on the relay | ``10``
 ETLTV_VIEWERPASSWORD  | Password spectators need to join the relay | ``None``
 ETLTV_DELAY           | Delay the relay's feed by this many seconds (``sv_etltv_delay``). This delays the recording too | ``0``
+ETLTV_AUTOACTION      | The relay's ``tvg_autoAction``: ``1`` records from the warmup countdown, ``2`` sends stats to spectators; add them up | ``3``
+ETLTV_AUTORECORD      | The relay's ``sv_etltv_autorecord``: ``1`` records from map load, warmup included | ``0``
 
 ### Uploads
 When ``ETLTV_UPLOAD_URL`` is set, each demo is uploaded once it is complete, never while it is still being written.
