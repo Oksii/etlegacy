@@ -39,14 +39,14 @@ func TestSlaveArgs(t *testing.T) {
 	cfg := Config{
 		Etlded: "/legacy/server/etlded", BasePath: "/legacy/server", StateDir: "/legacy/homepath/etltv",
 		MasterPort: "27960", TVPassword: "3tltv", Hostname: "My Server", RedirectURL: "https://dl",
-		Port: "27961", Name: "ETLTV", MaxClients: "10", Delay: "0",
+		Port: "27961", Name: "ETLTV", MaxClients: "10", Delay: "0", AutoRecord: "0", AutoAction: "3",
 	}
 
 	args := slaveArgs(cfg)
 	joined := strings.Join(args, " ")
 	for _, want := range []string{
 		"+set net_ip 127.0.0.1", "+set net_enabled 1", "+set net_port 27961",
-		"+set fs_homepath /legacy/homepath/etltv/home", "+set sv_etltv_autorecord 1",
+		"+set fs_homepath /legacy/homepath/etltv/home", "+set sv_etltv_autorecord 0", "+set tvg_autoAction 3",
 		"+set sv_hostname My Server ^7[TV]",
 	} {
 		if !strings.Contains(joined, want) {

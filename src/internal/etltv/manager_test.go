@@ -346,6 +346,29 @@ func TestConnectTimeoutRetries(t *testing.T) {
 	h.attach()
 }
 
+func TestLongWarmupKeepsTheSlave(t *testing.T) {
+	h := newHarness(t, true)
+	h.setPlayers("player")
+	f := h.attach()
+	f.say("----- Server Initialization ----", "Server: supply")
+	eventually(t, "join", func() bool {
+		h.m.mu.Lock()
+		defer h.m.mu.Unlock()
+		return h.m.run != nil && h.m.run.joined
+	})
+
+	h.advance(5 * time.Minute)
+	h.m.tick()
+	select {
+	case sig := <-f.sigs:
+		t.Fatalf("joined slave got %v while waiting for the countdown", sig)
+	case <-time.After(100 * time.Millisecond):
+	}
+	h.writeRaw("2026-10-02-213500-supply.tv_84")
+	f.say("Recording to tvdemos/2026-10-02-213500-supply.tv_84.")
+	eventually(t, "recording", func() bool { return h.m.Status().Recording == "2026-10-02-213500-supply.tv_84" })
+}
+
 func TestStateSurvivesRestart(t *testing.T) {
 	h := newHarness(t, false)
 	h.m.Handle(Request{Cmd: "start", Tag: "cup"})

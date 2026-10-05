@@ -28,6 +28,8 @@ type Config struct {
 	MaxClients     string
 	ViewerPassword string
 	Delay          string
+	AutoRecord     string        // sv_etltv_autorecord: record from map load
+	AutoAction     string        // tvg_autoAction: 1 records from the warmup countdown
 	IdleDetach     time.Duration // 0 never detaches
 
 	UploadURL   string

@@ -30,7 +30,8 @@ func slaveArgs(c Config) []string {
 	set("sv_wwwBaseURL", c.RedirectURL)
 	set("sv_wwwDownload", "1")
 	set("g_password", c.ViewerPassword)
-	set("sv_etltv_autorecord", "1")
+	set("sv_etltv_autorecord", c.AutoRecord)
+	set("tvg_autoAction", c.AutoAction)
 	set("sv_etltv_clientname", c.Name)
 	set("sv_etltv_delay", c.Delay) // CVAR_INIT, so it only takes effect from the command line
 

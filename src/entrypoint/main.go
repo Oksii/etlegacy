@@ -156,6 +156,8 @@ func loadConf() map[string]string {
 		"ETLTV_MAXCLIENTS":              getenv("ETLTV_MAXCLIENTS", "10"),
 		"ETLTV_VIEWERPASSWORD":          getenv("ETLTV_VIEWERPASSWORD", ""),
 		"ETLTV_DELAY":                   getenv("ETLTV_DELAY", "0"),
+		"ETLTV_AUTORECORD":              getenv("ETLTV_AUTORECORD", "0"),
+		"ETLTV_AUTOACTION":              getenv("ETLTV_AUTOACTION", "3"),
 		"ETLTV_IDLE_DETACH":             getenv("ETLTV_IDLE_DETACH", "120"),
 		"ETLTV_DEMO_DIR":                getenv("ETLTV_DEMO_DIR", homepath+"/tvdemos"),
 		"ETLTV_UPLOAD_URL":              getenv("ETLTV_UPLOAD_URL", ""),

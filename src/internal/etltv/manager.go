@@ -25,7 +25,7 @@ const (
 	// server go; an unrequested exit waits this long to tell the two apart.
 	exitSettle = 1500 * time.Millisecond
 	// A rejected slave (bad password) idles forever; this, plus any delay, is
-	// how long it gets to start recording.
+	// how long it gets to load the map. Recording may wait for the countdown.
 	connectTimeout = 60 * time.Second
 )
 
@@ -76,7 +76,7 @@ type slaveRun struct {
 	done    chan struct{}
 	started time.Time
 
-	recorded   bool
+	joined     bool
 	requested  bool
 	termSent   bool
 	stopReason string
@@ -169,8 +169,8 @@ func (m *Manager) tick() {
 		if players > 0 {
 			m.spawnLocked()
 		}
-	case !run.recorded && m.now().Sub(run.started) > m.connectTimeout():
-		m.logf("slave has not started recording after %s", m.connectTimeout())
+	case !run.joined && m.now().Sub(run.started) > m.connectTimeout():
+		m.logf("slave has not joined the server after %s", m.connectTimeout())
 		run.stopReason = reasonDisconnect
 		m.endLocked(run)
 	case m.cfg.IdleDetach <= 0 || players > 0:
@@ -247,12 +247,12 @@ func (m *Manager) handleLine(run *slaveRun, line string) {
 			run.mapName = ev.value
 			run.expectMap = false
 		}
+		run.joined = true
+		m.failures = 0
 	case evRecording:
 		finish, reason = run.takeStopped(), reasonMapChange // normally done by evInit already
 		run.rec = &recording{raw: ev.value, tag: m.state.Tag, mapName: run.mapName, started: m.now()}
 		begun = run.rec
-		run.recorded = true
-		m.failures = 0
 	case evStopped:
 		if run.rec != nil {
 			run.rec.stopped = true
