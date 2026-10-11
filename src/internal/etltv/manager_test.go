@@ -3,6 +3,9 @@ package etltv
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sync"
@@ -212,6 +215,10 @@ func eventually(t *testing.T, what string, cond func() bool) {
 
 func TestRecordsOneDemoPerMapAndStops(t *testing.T) {
 	h := newHarness(t, false)
+	h.m.routeID = func() string {
+		t.Error("route asked for a tagged demo's match id")
+		return ""
+	}
 	if resp := h.m.Handle(Request{Cmd: "start", Tag: "cup"}); !resp.OK {
 		t.Fatalf("start: %s", resp.Message)
 	}
@@ -249,6 +256,32 @@ func TestRecordsOneDemoPerMapAndStops(t *testing.T) {
 	eventually(t, "detach", func() bool { return !h.m.Status().Attached })
 	if !h.m.retryAt.IsZero() {
 		t.Errorf("a requested stop must not schedule a retry")
+	}
+}
+
+func TestUntaggedDemoTakesTheRouteMatchID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/match-manager/203.0.113.7/27960" || r.Header.Get("Authorization") != "Bearer tok" {
+			http.NotFound(w, r)
+			return
+		}
+		io.WriteString(w, `{"match_id": 1760212800, "match": {"alpha_teamname": "a"}}`)
+	}))
+	t.Cleanup(srv.Close)
+
+	h := newHarness(t, true)
+	h.m.routeID = routeMatchID(Config{
+		MatchURL: srv.URL + "/match-manager/", MatchToken: "tok", ServerIP: "203.0.113.7", MasterPort: "27960",
+	}, t.Logf)
+	h.setPlayers("player")
+	f := h.attach()
+
+	h.recordMap(f, "supply", "demo0000.tv_84")
+	f.say("Stopped demo.")
+	h.recordMap(f, "radar", "demo0001.tv_84")
+
+	if meta := h.finished("1760212800_2026-10-02_213000_supply.tv_84"); meta.Tag != "1760212800" {
+		t.Errorf("supply tag = %q, want the route's match id", meta.Tag)
 	}
 }
 

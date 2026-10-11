@@ -56,7 +56,8 @@ type Manager struct {
 	status   StatusFunc
 	logf     func(format string, args ...any)
 	now      func() time.Time
-	finished func() // a demo landed in DemoDir
+	finished func()        // a demo landed in DemoDir
+	routeID  func() string // nil leaves untagged demos untagged
 
 	wake    chan struct{}
 	closing chan struct{} // closed by Shutdown
@@ -104,7 +105,7 @@ func NewManager(cfg Config, start StartFunc, status StatusFunc, logf func(string
 	if finished == nil {
 		finished = func() {}
 	}
-	return &Manager{
+	m := &Manager{
 		cfg:      cfg,
 		start:    start,
 		status:   status,
@@ -116,6 +117,10 @@ func NewManager(cfg Config, start StartFunc, status StatusFunc, logf func(string
 		state:    state,
 		source:   source,
 	}
+	if cfg.MatchURL != "" && cfg.ServerIP != "" {
+		m.routeID = routeMatchID(cfg, logf)
+	}
+	return m
 }
 
 func (m *Manager) Run(ctx context.Context) {
@@ -393,6 +398,10 @@ func (m *Manager) finalize(rec *recording, reason string) {
 	if src == "" {
 		m.logf("finished demo %s not found, skipping", rec.raw)
 		return
+	}
+	// Not for swept leftovers: by then the route may hold a later match.
+	if rec.tag == "" && m.routeID != nil {
+		rec.tag = m.routeID()
 	}
 	m.finalizeFile(src, rec, reason)
 }
