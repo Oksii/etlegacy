@@ -34,6 +34,9 @@ type Config struct {
 
 	UploadURL   string
 	UploadToken string
+
+	MatchURL   string // match-manager base; untagged demos take its match id
+	MatchToken string
 }
 
 func (c Config) statePath() string { return filepath.Join(c.StateDir, "state") }

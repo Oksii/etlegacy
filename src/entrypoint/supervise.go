@@ -138,6 +138,8 @@ func etltvConfig(conf map[string]string) etltv.Config {
 		IdleDetach:     time.Duration(idle) * time.Second,
 		UploadURL:      conf["ETLTV_UPLOAD_URL"],
 		UploadToken:    conf["ETLTV_UPLOAD_TOKEN"],
+		MatchURL:       conf["STATS_API_URL_MATCHID"],
+		MatchToken:     conf["STATS_API_TOKEN"],
 	}
 }
 
