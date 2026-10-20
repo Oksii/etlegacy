@@ -47,7 +47,7 @@ func TestSlaveArgs(t *testing.T) {
 	for _, want := range []string{
 		"+set net_ip 127.0.0.1", "+set net_enabled 1", "+set net_port 27961",
 		"+set fs_homepath /legacy/homepath/etltv/home", "+set sv_etltv_autorecord 0", "+set tvg_autoAction 3",
-		"+set sv_hostname My Server ^7[TV]",
+		"+set sv_hostname My Server ^7[TV]", "+set sv_dlRate 500000",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("args missing %q:\n%s", want, joined)

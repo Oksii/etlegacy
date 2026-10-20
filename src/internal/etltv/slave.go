@@ -29,6 +29,7 @@ func slaveArgs(c Config) []string {
 	set("sv_advert", "0") // keep the slave off master lists and trackers
 	set("sv_wwwBaseURL", c.RedirectURL)
 	set("sv_wwwDownload", "1")
+	set("sv_dlRate", "500000") // as the game servers have it; the default sends a map at 100 kB/s
 	set("g_password", c.ViewerPassword)
 	set("sv_etltv_autorecord", c.AutoRecord)
 	set("tvg_autoAction", c.AutoAction)
