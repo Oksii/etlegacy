@@ -191,6 +191,8 @@ The server can record matches as ETLTV demos (`.tv_84`). The ET: Legacy client p
 `/tv demo <name>` (put the file in `legacy/tvdemos/`; `/tv ff <seconds>` skips ahead).
 A second `etlded` joins the server as an ETLTV slave and records one demo per map, from the warmup countdown. Both stopwatch rounds
 of a map, and the warmup between them, end up in the same file. A map that never leaves warmup records nothing.
+The demo ends when the map changes, or when the server restarts into warmup after a stopwatch map's second round, so the last map
+of a match is saved even while players stay on. A match played again on the same map records a demo of its own.
 
 Recording is armed on demand. It stays armed across restarts, until it is disarmed:
 
@@ -240,6 +242,7 @@ The upload is a `multipart/form-data` POST:
 
 `end_reason` is one of the following:
 - `map_change`
+- `match_end` (the server restarted into warmup after a stopwatch map's second round)
 - `stop` (``etltv stop``)
 - `idle` (server empty)
 - `quit` (the server quit, e.g. `rcon quit`)

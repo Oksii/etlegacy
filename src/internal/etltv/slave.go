@@ -52,6 +52,8 @@ const (
 	evRecording
 	evStopped
 	evShutdown
+	evMatchOver // a stopwatch map's second round ended
+	evRestart   // map_restart, e.g. from intermission into warmup
 )
 
 type event struct {
@@ -85,12 +87,21 @@ func parseLine(line string) event {
 	case strings.HasPrefix(line, "----- Server Shutdown ("):
 		reason := strings.TrimPrefix(line, "----- Server Shutdown (")
 		return event{evShutdown, strings.TrimSuffix(reason, ") -----")}
+	// The game's print at the end of a stopwatch map's second round (the first
+	// round's says "Clock set to"). The slave echoes only prints sent to
+	// everybody, so a player cannot fake it.
+	case strings.HasPrefix(line, `broadcast: print ">>> Objective reached at `),
+		strings.HasPrefix(line, `broadcast: print ">>> Objective NOT reached in time`):
+		return event{kind: evMatchOver}
+	case strings.HasPrefix(line, "==== TVShutdownGame (1 - "):
+		return event{kind: evRestart}
 	}
 	return event{}
 }
 
 const (
 	reasonMapChange   = "map_change"
+	reasonMatchEnd    = "match_end"
 	reasonStop        = "stop"
 	reasonQuit        = "quit"
 	reasonIdle        = "idle"

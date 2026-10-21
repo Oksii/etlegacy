@@ -34,7 +34,9 @@ type Process interface {
 	Done() <-chan struct{} // closed once the process has been reaped
 }
 
-type StartFunc func(argv []string, out *os.File) (Process, error)
+// StartFunc starts the slave with stdin as its console input and out as its
+// console output.
+type StartFunc func(argv []string, stdin, out *os.File) (Process, error)
 
 type StatusFunc func() (etlproto.Status, error)
 
@@ -74,6 +76,7 @@ type Manager struct {
 
 type slaveRun struct {
 	proc    Process
+	console *os.File // the slave's stdin, which etlded reads as console input
 	done    chan struct{}
 	started time.Time
 
@@ -82,9 +85,11 @@ type slaveRun struct {
 	termSent   bool
 	stopReason string
 
-	expectMap bool
-	mapName   string
-	rec       *recording
+	expectMap   bool
+	mapName     string
+	rec         *recording
+	matchOver   bool // the second stopwatch round of rec's map has ended
+	endingMatch bool // stoprecord sent for the end of the match
 }
 
 type recording struct {
@@ -195,15 +200,24 @@ func (m *Manager) spawnLocked() {
 		m.retryLocked(fmt.Sprintf("create pipe: %v", err))
 		return
 	}
-	proc, err := m.start(slaveArgs(m.cfg), w)
-	w.Close()
+	cr, cw, err := os.Pipe()
 	if err != nil {
 		r.Close()
+		w.Close()
+		m.retryLocked(fmt.Sprintf("create pipe: %v", err))
+		return
+	}
+	proc, err := m.start(slaveArgs(m.cfg), cr, w)
+	w.Close()
+	cr.Close()
+	if err != nil {
+		r.Close()
+		cw.Close()
 		m.retryLocked(fmt.Sprintf("start slave: %v", err))
 		return
 	}
 
-	run := &slaveRun{proc: proc, done: make(chan struct{}), started: m.now()}
+	run := &slaveRun{proc: proc, console: cw, done: make(chan struct{}), started: m.now()}
 	m.run = run
 	m.emptySince = time.Time{}
 	m.logf("attaching to 127.0.0.1:%s as %s", m.cfg.MasterPort, m.cfg.Name)
@@ -228,6 +242,7 @@ func (m *Manager) follow(run *slaveRun, r io.ReadCloser) {
 	}
 	r.Close()
 	<-run.proc.Done()
+	run.console.Close()
 	m.handleExit(run)
 	close(run.done)
 }
@@ -239,13 +254,14 @@ func (m *Manager) handleLine(run *slaveRun, line string) {
 	}
 
 	var finish, begun *recording
-	var reason string
+	var reason, command string
 
 	m.mu.Lock()
 	switch ev.kind {
 	case evInit:
 		// A new map is loading: a just-stopped recording ended with the map.
 		run.expectMap = true
+		run.matchOver, run.endingMatch = false, false
 		finish, reason = run.takeStopped(), reasonMapChange
 	case evMap:
 		if run.expectMap {
@@ -258,10 +274,27 @@ func (m *Manager) handleLine(run *slaveRun, line string) {
 		finish, reason = run.takeStopped(), reasonMapChange // normally done by evInit already
 		run.rec = &recording{raw: ev.value, tag: m.state.Tag, mapName: run.mapName, started: m.now()}
 		begun = run.rec
+	case evMatchOver:
+		run.matchOver = run.rec != nil
+	case evRestart:
+		// The match's intermission is over and the map restarts into warmup.
+		// Nothing of the match is left to record, and a match played next
+		// records afresh from its own countdown. Otherwise the demo runs on
+		// until the map changes or the server empties, which after a match's
+		// last map is as long as anybody stays on.
+		if run.matchOver && run.rec != nil && !run.rec.stopped {
+			run.endingMatch = true
+			command = "stoprecord"
+		}
+		run.matchOver = false
 	case evStopped:
 		if run.rec != nil {
 			run.rec.stopped = true
+			if run.endingMatch {
+				finish, reason = run.takeStopped(), reasonMatchEnd
+			}
 		}
+		run.endingMatch = false
 	case evShutdown:
 		if !run.termSent {
 			run.stopReason = shutdownReason(ev.value)
@@ -272,6 +305,11 @@ func (m *Manager) handleLine(run *slaveRun, line string) {
 	}
 	m.mu.Unlock()
 
+	if command != "" {
+		if _, err := fmt.Fprintln(run.console, command); err != nil {
+			m.logf("send %q to the slave: %v", command, err)
+		}
+	}
 	if finish != nil {
 		m.finalize(finish, reason)
 	}

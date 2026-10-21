@@ -200,16 +200,11 @@ func startETLTV(kids *children, conf map[string]string, masterPid int) func(reas
 		fmt.Printf("[etltv] "+format+"\n", args...)
 	}
 
-	start := func(argv []string, out *os.File) (etltv.Process, error) {
-		devnull, err := os.Open(os.DevNull)
-		if err != nil {
-			return nil, err
-		}
-		defer devnull.Close()
+	start := func(argv []string, stdin, out *os.File) (etltv.Process, error) {
 		attr := &os.ProcAttr{
 			Dir:   gameBase,
 			Env:   os.Environ(),
-			Files: []*os.File{devnull, out, out},
+			Files: []*os.File{stdin, out, out},
 			// Its own process group, so a tty Ctrl-C meant for the server
 			// does not also hit the slave; we stop it ourselves, in order.
 			Sys: &syscall.SysProcAttr{Setpgid: true},

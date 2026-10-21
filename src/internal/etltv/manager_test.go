@@ -1,6 +1,7 @@
 package etltv
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,11 +17,13 @@ import (
 	"github.com/oksii/etlegacy/src/internal/etlproto"
 )
 
-// fakeSlave prints console lines for the test and records the signals it gets.
+// fakeSlave prints console lines for the test and records the signals and
+// console commands it gets.
 type fakeSlave struct {
 	out  *os.File
 	done chan struct{}
 	sigs chan syscall.Signal
+	cmds chan string
 	once sync.Once
 }
 
@@ -87,8 +90,12 @@ func newHarnessWith(t *testing.T, cfg Config) *harness {
 		now:    time.Date(2026, 10, 2, 21, 30, 0, 0, time.UTC),
 	}
 
-	start := func(argv []string, out *os.File) (Process, error) {
+	start := func(argv []string, stdin, out *os.File) (Process, error) {
 		fd, err := syscall.Dup(int(out.Fd()))
+		if err != nil {
+			return nil, err
+		}
+		in, err := syscall.Dup(int(stdin.Fd()))
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +103,16 @@ func newHarnessWith(t *testing.T, cfg Config) *harness {
 			out:  os.NewFile(uintptr(fd), "slave"),
 			done: make(chan struct{}),
 			sigs: make(chan syscall.Signal, 8),
+			cmds: make(chan string, 8),
 		}
+		go func() {
+			console := os.NewFile(uintptr(in), "console")
+			defer console.Close()
+			sc := bufio.NewScanner(console)
+			for sc.Scan() {
+				f.cmds <- sc.Text()
+			}
+		}()
 		h.mu.Lock()
 		h.started = append(h.started, f)
 		h.mu.Unlock()
@@ -257,6 +273,79 @@ func TestRecordsOneDemoPerMapAndStops(t *testing.T) {
 	if !h.m.retryAt.IsZero() {
 		t.Errorf("a requested stop must not schedule a retry")
 	}
+}
+
+func expectCommand(t *testing.T, f *fakeSlave, want string) {
+	t.Helper()
+	select {
+	case got := <-f.cmds:
+		if got != want {
+			t.Fatalf("console command = %q, want %q", got, want)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("no %q sent to the slave", want)
+	}
+}
+
+func expectNoCommand(t *testing.T, f *fakeSlave) {
+	t.Helper()
+	select {
+	case got := <-f.cmds:
+		t.Fatalf("unexpected console command %q", got)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// The last map of a match has no map change to end its demo, and the server
+// may never empty: whoever stays on keeps it recording.
+func TestMatchEndSavesTheDemo(t *testing.T) {
+	h := newHarness(t, false)
+	if resp := h.m.Handle(Request{Cmd: "start", Tag: "cup"}); !resp.OK {
+		t.Fatalf("start: %s", resp.Message)
+	}
+	h.setPlayers("player")
+	f := h.attach()
+
+	h.recordMap(f, "sw_goldrush_te", "demo0000.tv_84")
+	f.say(`broadcast: print ">>> Clock set to: 9:04\n\n\n"`,
+		"==== TVShutdownGame (1 - sw_goldrush_te) ====",
+		"Already recording.")
+	expectNoCommand(t, f) // round one only: round two goes in the same demo
+
+	h.advance(15 * time.Minute)
+	f.say(`broadcast: print ">>> Objective reached at 5:19 (original: 9:04)\n\n\n"`,
+		"==== TVShutdownGame (1 - sw_goldrush_te) ====")
+	expectCommand(t, f, "stoprecord")
+	f.say("Stopped demo.")
+
+	meta := h.finished("cup_2026-10-02_213000_sw_goldrush_te.tv_84")
+	if meta.EndReason != reasonMatchEnd || meta.Map != "sw_goldrush_te" {
+		t.Errorf("metadata = %+v", meta)
+	}
+	if st := h.m.Status(); !st.Attached || st.Recording != "" {
+		t.Errorf("status = %+v, want attached and not recording", st)
+	}
+
+	// A rematch on the same map records from its own countdown.
+	h.writeRaw("demo0001.tv_84")
+	f.say("Recording to tvdemos/demo0001.tv_84.")
+	eventually(t, "recording demo0001", func() bool { return h.m.Status().Recording == "demo0001.tv_84" })
+}
+
+func TestMapVoteAfterMatchEnd(t *testing.T) {
+	h := newHarness(t, true)
+	h.setPlayers("player")
+	f := h.attach()
+
+	h.recordMap(f, "supply", "demo0000.tv_84")
+	f.say(`broadcast: print ">>> Objective NOT reached in time (12:52)\n\n\n"`,
+		"Stopped demo.", "==== TVShutdownGame (0 - supply) ====")
+	h.recordMap(f, "radar", "demo0001.tv_84")
+
+	if meta := h.finished("2026-10-02_213000_supply.tv_84"); meta.EndReason != reasonMapChange {
+		t.Errorf("end_reason = %q, want %q", meta.EndReason, reasonMapChange)
+	}
+	expectNoCommand(t, f)
 }
 
 func TestUntaggedDemoTakesTheRouteMatchID(t *testing.T) {
