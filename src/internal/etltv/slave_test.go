@@ -24,8 +24,14 @@ func TestParseLine(t *testing.T) {
 		{"       0 Server: radar\x1b[0m", event{evMap, "radar"}},
 		{"   41250 \x1b[1;33mStopped demo.\x1b[0m", event{kind: evStopped}},
 		{"       0 ----- Database Initialization --\x1b[0m", event{}},
+		{" 7966150 broadcast: print \"\x1b[1;33m>>> Objective reached at \x1b[1;37m9:55\x1b[1;33m (original: \x1b[1;37m12:00\x1b[1;33m)\x1b[0m\\n\x1b[0m\\n\x1b[0m\\n\"\x1b[0m\r", event{kind: evMatchOver}},
+		{" 4817900 broadcast: print \"\x1b[1;33m>>> Objective NOT reached in time (\x1b[1;37m12:52\x1b[1;33m)\x1b[0m\\n\x1b[0m\\n\x1b[0m\\n\"\x1b[0m\r", event{kind: evMatchOver}},
+		{" 3029350 broadcast: print \"\x1b[1;33m>>> Clock set to: \x1b[1;37m12:52\x1b[0m\\n\x1b[0m\\n\x1b[0m\\n\"\x1b[0m\r", event{}},
+		{"  331250 ==== TVShutdownGame (1 - supply) ====\x1b[0m\r", event{kind: evRestart}},
+		{"  304500 ==== TVShutdownGame (0 - radar) ====\x1b[0m\r", event{}},
 		// Relayed chat always has a name prefix.
 		{"player: Stopped demo.", event{}},
+		{`broadcast: chat "player: >>> Objective reached at 1:00"`, event{}},
 		{"Hunk_Clear: reset the hunk ok", event{}},
 	}
 	for _, tc := range tests {
