@@ -60,6 +60,10 @@ type Manager struct {
 	now      func() time.Time
 	finished func()        // a demo landed in DemoDir
 	routeID  func() string // nil leaves untagged demos untagged
+	lookupIP func() string // nil leaves a demo with no ServerIP without one
+
+	ipMu sync.Mutex
+	ip   string
 
 	wake    chan struct{}
 	closing chan struct{} // closed by Shutdown
@@ -117,15 +121,26 @@ func NewManager(cfg Config, start StartFunc, status StatusFunc, logf func(string
 		logf:     logf,
 		now:      time.Now,
 		finished: finished,
+		lookupIP: cfg.LookupIP,
+		ip:       cfg.ServerIP,
 		wake:     make(chan struct{}, 1),
 		closing:  make(chan struct{}),
 		state:    state,
 		source:   source,
 	}
-	if cfg.MatchURL != "" && cfg.ServerIP != "" {
-		m.routeID = routeMatchID(cfg, logf)
+	if cfg.MatchURL != "" {
+		m.routeID = routeMatchID(cfg, m.serverIP, logf)
 	}
 	return m
+}
+
+func (m *Manager) serverIP() string {
+	m.ipMu.Lock()
+	defer m.ipMu.Unlock()
+	if m.ip == "" && m.lookupIP != nil {
+		m.ip = m.lookupIP()
+	}
+	return m.ip
 }
 
 func (m *Manager) Run(ctx context.Context) {
@@ -458,7 +473,7 @@ func (m *Manager) finalizeFile(src string, rec *recording, reason string) {
 		StartedAt:  rec.started,
 		EndedAt:    m.now(),
 		EndReason:  reason,
-		ServerIP:   m.cfg.ServerIP,
+		ServerIP:   m.serverIP(),
 		ServerPort: m.cfg.MasterPort,
 		Hostname:   m.cfg.Hostname,
 	}

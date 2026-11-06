@@ -126,6 +126,7 @@ func etltvConfig(conf map[string]string) etltv.Config {
 		Hostname:       conf["HOSTNAME"],
 		RedirectURL:    conf["REDIRECTURL"],
 		ServerIP:       conf["MAP_IP"],
+		LookupIP:       lookupPublicIP,
 		Autostart:      parseBoolValue(conf["ETLTV_AUTOSTART"], false),
 		Public:         parseBoolValue(conf["ETLTV_PUBLIC"], false),
 		Port:           conf["ETLTV_PORT"],

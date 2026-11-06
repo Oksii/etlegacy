@@ -19,7 +19,8 @@ type Config struct {
 	MaxSlaves      string // the server's sv_etltv_maxslaves
 	Hostname       string
 	RedirectURL    string
-	ServerIP       string
+	ServerIP       string        // MAP_IP, or the public address found at boot
+	LookupIP       func() string // the public address, asked while ServerIP is empty
 
 	Autostart      bool
 	Public         bool

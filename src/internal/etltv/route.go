@@ -11,11 +11,16 @@ import (
 
 const routeTimeout = 2 * time.Second
 
-func routeMatchID(cfg Config, logf func(string, ...any)) func() string {
-	url := strings.TrimRight(cfg.MatchURL, "/") + "/" + cfg.ServerIP + "/" + cfg.MasterPort
+func routeMatchID(cfg Config, serverIP func() string, logf func(string, ...any)) func() string {
+	base := strings.TrimRight(cfg.MatchURL, "/") + "/"
 	client := &http.Client{Timeout: routeTimeout}
 	return func() string {
-		id, err := fetchMatchID(client, url, cfg.MatchToken)
+		ip := serverIP()
+		if ip == "" {
+			logf("no server address to look the match id up by, leaving the demo untagged")
+			return ""
+		}
+		id, err := fetchMatchID(client, base+ip+"/"+cfg.MasterPort, cfg.MatchToken)
 		if err != nil {
 			logf("match id lookup failed, leaving the demo untagged: %v", err)
 		}

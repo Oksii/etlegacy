@@ -875,20 +875,24 @@ func resolvePublicIP() string {
 	if ip := os.Getenv("MAP_IP"); ip != "" {
 		return ip
 	}
-	client := &http.Client{Timeout: 3 * time.Second}
 	for i := 0; i < 3; i++ {
-		resp, err := client.Get("https://api.ipify.org")
-		if err != nil {
-			continue
-		}
-		b, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if ip := strings.TrimSpace(string(b)); ip != "" {
+		if ip := lookupPublicIP(); ip != "" {
 			return ip
 		}
 	}
 	fmt.Println("WARNING: Could not resolve public IP, MAP_IP will not be set")
 	return ""
+}
+
+func lookupPublicIP() string {
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("https://api.ipify.org")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return strings.TrimSpace(string(b))
 }
 
 func parseCLIArgs() []string {
